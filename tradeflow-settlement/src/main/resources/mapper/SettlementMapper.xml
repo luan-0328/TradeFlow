@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.settlement.SettlementMapper">
+ <select id="tasks" resultType="map">SELECT task_no,claim_version,scan_cursor,candidate_cursor,lease_until,last_error,created_at FROM settlement_task ORDER BY task_no</select>
+ <insert id="ensureTask">INSERT INTO settlement_task(task_no,lease_owner) VALUES('SCAN','') ON DUPLICATE KEY UPDATE task_no=task_no</insert>
+ <select id="lockTask" resultType="map">SELECT * FROM settlement_task WHERE task_no='SCAN' FOR UPDATE</select>
+ <update id="claim">UPDATE settlement_task SET lease_owner=#{owner},claim_version=claim_version+1,lease_until=TIMESTAMPADD(SECOND,120,UTC_TIMESTAMP(3)) WHERE task_no='SCAN' AND (lease_until IS NULL OR lease_until&lt;=UTC_TIMESTAMP(3))</update>
+ <select id="fence" resultType="map">SELECT * FROM settlement_task WHERE task_no='SCAN' AND lease_owner=#{owner} AND claim_version=#{version} AND lease_until&gt;UTC_TIMESTAMP(3) FOR UPDATE</select>
+ <update id="finish">UPDATE settlement_task SET scan_cursor=#{cursor},lease_until=NULL,last_error=#{error} WHERE task_no='SCAN' AND lease_owner=#{owner} AND claim_version=#{version} AND lease_until&gt;UTC_TIMESTAMP(3)</update>
+ <update id="candidateCursor">UPDATE settlement_task SET candidate_cursor=#{cursor} WHERE task_no='SCAN'</update>
+ <insert id="account">INSERT INTO settlement_account(merchant_id) VALUES(#{merchant}) ON DUPLICATE KEY UPDATE merchant_id=merchant_id</insert>
+ <select id="lockAccount" resultType="map">SELECT * FROM settlement_account WHERE merchant_id=#{merchant} FOR UPDATE</select>
+ <select id="item" resultType="map">SELECT * FROM settlement_item WHERE payment_no=#{payment}</select>
+ <select id="lockItem" resultType="map">SELECT * FROM settlement_item WHERE payment_no=#{payment} FOR UPDATE</select>
+ <select id="fact" resultType="map">SELECT * FROM settlement_fact WHERE kind=#{kind} AND business_no=#{business}</select>
+ <insert id="insertFact">INSERT INTO settlement_fact(kind,business_no,payment_no,order_no,merchant_id,amount_cents,currency,occurred_at) VALUES(#{f.kind},#{f.businessNo},#{f.paymentNo},#{f.orderNo},#{merchant},#{f.amountCents},#{f.currency},#{f.occurredAt})</insert>
+ <insert id="insertItem">INSERT INTO settlement_item(payment_no,order_no,merchant_id,paid_cents,fee_cents,fee_bps,freeze_days) VALUES(#{f.paymentNo},#{f.orderNo},#{merchant},#{f.amountCents},#{fee},#{bps},#{days})</insert>
+ <update id="refund">UPDATE settlement_item SET refund_cents=refund_cents+#{amount},fee_cents=#{fee} WHERE payment_no=#{payment} AND refund_cents+#{amount}&lt;=paid_cents</update>
+ <update id="debt">UPDATE settlement_account SET debt_cents=debt_cents+#{delta} WHERE merchant_id=#{merchant} AND debt_cents+#{delta}&gt;=0</update>
+ <insert id="ledger">INSERT INTO settlement_ledger(entry_key,payment_no,merchant_id,entry_type,principal_delta,fee_delta,payable_delta,simulated_delta,batch_no) VALUES(#{key},#{payment},#{merchant},#{type},#{principal},#{fee},#{payable},#{simulated},#{batch})</insert>
+ <select id="candidates" resultType="map">SELECT * FROM settlement_item WHERE status='FROZEN' AND id&gt;#{after} ORDER BY id LIMIT 20</select>
+ <update id="settle">UPDATE settlement_item SET status='SIMULATED_COMPLETED',batch_no=#{batch} WHERE payment_no=#{payment} AND status='FROZEN'</update>
+ <insert id="batch">INSERT INTO settlement_batch(batch_no,payment_no,merchant_id,net_cents,simulated_payout_cents,debt_offset_cents) VALUES(#{batch},#{payment},#{merchant},#{net},#{payout},#{offset})</insert>
+ <!-- table由应用层常量白名单提供；商家过滤始终绑定参数，不能传入外部表名。 -->
+ <select id="statements" resultType="map">SELECT i.payment_no,i.order_no,i.merchant_id,i.paid_cents,i.refund_cents,i.fee_cents,i.fee_bps,i.freeze_days,i.status,i.paid_cents-i.refund_cents-i.fee_cents AS current_net_cents,i.created_at,b.batch_no,b.net_cents AS batch_net_cents,b.simulated_payout_cents,b.debt_offset_cents,b.created_at AS simulated_completed_at FROM settlement_item i LEFT JOIN settlement_batch b ON b.payment_no=i.payment_no <where><if test="merchant != null">i.merchant_id=#{merchant}</if></where> ORDER BY i.id DESC LIMIT #{size} OFFSET #{offset}</select>
+ <select id="page" resultType="map">SELECT * FROM ${table} <where><if test="merchant != null">merchant_id=#{merchant}</if></where> ORDER BY id DESC LIMIT #{size} OFFSET #{offset}</select>
+ <select id="summary" resultType="map">SELECT COALESCE(SUM(principal_delta),0) AS principalCents,COALESCE(SUM(fee_delta),0) AS feeCents,COALESCE(SUM(payable_delta),0) AS payableCents,COALESCE(SUM(simulated_delta),0) AS simulatedCents,(SELECT COALESCE(SUM(debt_cents),0) FROM settlement_account <where><if test="merchant != null">merchant_id=#{merchant}</if></where>) AS debtCents FROM settlement_ledger <where><if test="merchant != null">merchant_id=#{merchant}</if></where></select>
+ <!-- 逐支付核对事实镜像、当前单据、费用快照、账本四维和批次，不只检查总额。 -->
+ <select id="differences" resultType="map">
+ SELECT i.payment_no,i.paid_cents,i.refund_cents,i.fee_cents FROM settlement_item i
+ LEFT JOIN (SELECT payment_no,SUM(CASE WHEN kind='PAYMENT_SUCCEEDED' THEN amount_cents ELSE 0 END) paid,SUM(CASE WHEN kind='REFUND_SUCCEEDED' THEN amount_cents ELSE 0 END) refunded FROM settlement_fact GROUP BY payment_no) f ON f.payment_no=i.payment_no
+ LEFT JOIN (SELECT payment_no,SUM(principal_delta) principal,SUM(fee_delta) fee,SUM(payable_delta) payable,SUM(simulated_delta) simulated FROM settlement_ledger GROUP BY payment_no) l ON l.payment_no=i.payment_no
+ LEFT JOIN settlement_batch b ON b.payment_no=i.payment_no
+ WHERE COALESCE(f.paid,0)!=i.paid_cents OR COALESCE(f.refunded,0)!=i.refund_cents OR COALESCE(l.principal,0)!=i.paid_cents-i.refund_cents OR COALESCE(l.fee,0)!=i.fee_cents OR i.fee_cents!=FLOOR((CAST(i.paid_cents AS DECIMAL(30,0))-i.refund_cents)*i.fee_bps/10000) OR COALESCE(l.principal,0)-COALESCE(l.fee,0)!=COALESCE(l.payable,0)+COALESCE(l.simulated,0) OR (i.status='SIMULATED_COMPLETED' AND b.id IS NULL) OR (i.status='FROZEN' AND b.id IS NOT NULL)
+ OR (i.status='FROZEN' AND (COALESCE(l.payable,0)!=i.paid_cents-i.refund_cents-i.fee_cents OR COALESCE(l.simulated,0)!=0))
+ OR (i.status='SIMULATED_COMPLETED' AND (COALESCE(l.payable,0)!=0 OR COALESCE(l.simulated,0)!=i.paid_cents-i.refund_cents-i.fee_cents))
+ UNION ALL
+ SELECT CONCAT('MERCHANT:',a.merchant_id) payment_no,a.debt_cents paid_cents,COALESCE(r.refund_debt,0)-COALESCE(b.offsets,0) refund_cents,0 fee_cents FROM settlement_account a
+ LEFT JOIN (SELECT merchant_id,-SUM(simulated_delta) refund_debt FROM settlement_ledger WHERE entry_type='POST_SETTLEMENT_REFUND' GROUP BY merchant_id) r ON r.merchant_id=a.merchant_id
+ LEFT JOIN (SELECT merchant_id,SUM(debt_offset_cents) offsets FROM settlement_batch GROUP BY merchant_id) b ON b.merchant_id=a.merchant_id
+ WHERE a.debt_cents!=COALESCE(r.refund_debt,0)-COALESCE(b.offsets,0)
+ </select>
+ <insert id="reconciliation">INSERT INTO settlement_reconciliation(run_no,result,detail) VALUES(#{run},#{result},CAST(#{detail} AS JSON))</insert>
+ <insert id="audit">INSERT INTO settlement_audit(actor_id,action) VALUES(#{actor},#{action})</insert>
+</mapper>

@@ -1,0 +1,4 @@
+com.tradeflow.web.ServiceWebAutoConfiguration
+com.tradeflow.discovery.DiscoveryHttpAutoConfiguration
+com.tradeflow.messaging.MessagingAutoConfiguration
+com.tradeflow.observability.ObservabilityAutoConfiguration

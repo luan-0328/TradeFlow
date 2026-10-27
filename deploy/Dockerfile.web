@@ -1,0 +1,25 @@
+# 固定官方多架构镜像摘要；npm依赖由根锁文件决定，不把宿主凭据或node_modules带入构建。
+FROM node:24.15.0-alpine@sha256:d1b3b4da11eefd5941e7f0b9cf17783fc99d9c6fc34884a665f40a06dbdfc94f AS build
+WORKDIR /build
+COPY package.json package-lock.json ./
+COPY web-user/package.json ./web-user/package.json
+COPY web-admin/package.json ./web-admin/package.json
+COPY web-shared/package.json ./web-shared/package.json
+RUN npm ci --no-audit --no-fund
+COPY web-user/ ./web-user/
+COPY web-admin/ ./web-admin/
+COPY web-shared/ ./web-shared/
+RUN npm run build
+
+FROM nginx:1.28.3-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236 AS runtime
+COPY deploy/web/nginx.conf /etc/nginx/nginx.conf
+# 非root监听8080，PID与请求临时文件仅写入Compose提供的/tmp，不运行修改配置的镜像入口脚本。
+USER nginx
+EXPOSE 8080
+ENTRYPOINT ["nginx", "-g", "daemon off;"]
+
+FROM runtime AS web-user
+COPY --from=build /build/web-user/dist/ /usr/share/nginx/html/
+
+FROM runtime AS web-admin
+COPY --from=build /build/web-admin/dist/ /usr/share/nginx/html/

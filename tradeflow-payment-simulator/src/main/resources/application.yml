@@ -1,0 +1,161 @@
+# 统一Nacos服务发现：dev/prod必须注册；test仅隔离注册，无服务直连回退。
+# Nacos配置中心独立开关；namespace/group须一致，注册地址必须可被调用方访问。
+server:
+  port: ${SERVER_PORT:8086}
+  shutdown: graceful
+spring:
+  application:
+    name: tradeflow-payment-simulator
+  profiles:
+    default: dev
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  datasource:
+    username: ${TRADEFLOW_PAYMENT_SIMULATOR_DB_USER}
+    password: ${TRADEFLOW_PAYMENT_SIMULATOR_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 1
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+      connection-init-sql: SET time_zone = '+00:00'
+  flyway:
+    enabled: false
+  task:
+    scheduling:
+      pool:
+        size: 2
+  lifecycle:
+    timeout-per-shutdown-phase: 15s
+  cloud:
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:18848}
+      username: ${NACOS_USERNAME:}
+      password: ${NACOS_PASSWORD:}
+      config:
+        enabled: ${TRADEFLOW_NACOS_CONFIG_ENABLED:false}
+        import-check:
+          enabled: false
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:TRADEFLOW}
+      discovery:
+        enabled: true
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:TRADEFLOW}
+        ip: ${NACOS_DISCOVERY_IP:127.0.0.1}
+    loadbalancer:
+      retry:
+        enabled: false
+    openfeign:
+      client:
+        config:
+          default:
+            connectTimeout: 1000
+            readTimeout: 3000
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    arg-name-based-constructor-auto-mapping: true
+  rabbitmq:
+    dynamic: false
+management:
+  server:
+    port: ${MANAGEMENT_SERVER_PORT:18086}
+    address: ${MANAGEMENT_BIND_ADDRESS:127.0.0.1}
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 50ms,100ms,300ms,1s,3s
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db
+      show-details: never
+      probes:
+        enabled: true
+  health:
+    redis:
+      enabled: false
+    rabbit:
+      enabled: false
+tradeflow:
+  monitoring-token: ${TRADEFLOW_MONITORING_TOKEN}
+  observability:
+    enabled: true
+  service:
+    code: payment-simulator
+    display-name: 独立支付模拟器
+  internal:
+    channel-token: ${TRADEFLOW_CHANNEL_SERVICE_TOKEN}
+  callback-secret: ${TRADEFLOW_CALLBACK_SECRET}
+  simulator-admin-token: ${TRADEFLOW_SIMULATOR_ADMIN_TOKEN}
+info:
+  app:
+    stage: B8_OBSERVABILITY_UNTESTED
+springdoc:
+  swagger-ui:
+    disable-swagger-default-url: true
+    operations-sorter: alpha
+logging:
+  structured:
+    format:
+      console: logstash
+    json:
+      add:
+        service: ${spring.application.name}
+  pattern:
+    level: '%5p [requestId=%X{requestId:-} traceId=%X{traceId:-}]'
+---
+server:
+  address: 127.0.0.1
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:mysql://127.0.0.1:${MYSQL_PORT:13316}/trade_payment_simulator?useUnicode=true&characterEncoding=UTF-8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
+---
+server:
+  address: 127.0.0.1
+  port: 0
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: ${TRADEFLOW_PAYMENT_SIMULATOR_TEST_DB_URL:jdbc:mysql://127.0.0.1:13316/trade_payment_simulator_test?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true}
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+        register-enabled: false
+      config:
+        enabled: false
+tradeflow:
+  observability:
+    enabled: false
+---
+server:
+  address: ${BIND_ADDRESS:0.0.0.0}
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/trade_payment_simulator?useUnicode=true&characterEncoding=UTF-8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
+  cloud:
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      discovery:
+        ip: ${NACOS_DISCOVERY_IP:}

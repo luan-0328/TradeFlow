@@ -1,0 +1,39 @@
+name: Build delivery (tests skipped)
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Package (tests explicitly skipped)
+        run: chmod +x mvnw && ./mvnw -B -ntp package -Dmaven.test.skip=true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+          cache: npm
+      - name: Install locked frontend dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build both frontends (type check and Vite)
+        run: npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Package runtime artifacts without data or secrets
+        run: python scripts/Package-Release.py --output-dir release-artifacts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tradeflow-${{ github.sha }}
+          path: |
+            release-artifacts/*.zip
+            release-artifacts/*.zip.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

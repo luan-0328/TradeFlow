@@ -1,0 +1,8 @@
+# 后端镜像只需要启动JAR；不传源码、运输压缩包、运行凭据和其他工作目录。
+**
+!tradeflow-*/
+!tradeflow-*/target/
+!tradeflow-*/target/*-0.1.0-SNAPSHOT.jar
+!deploy/
+!deploy/Dockerfile
+!deploy/Dockerfile.dockerignore

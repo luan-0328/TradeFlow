@@ -1,0 +1,13 @@
+# 后端镜像仍需各服务已构建JAR；禁止发送本机秘密与无关前端依赖/产物。
+.git
+.local
+.idea
+.superpowers
+**/node_modules
+**/dist
+**/__pycache__
+**/*.log
+**/.env
+**/.env.*
+**/target/*
+!**/target/*-0.1.0-SNAPSHOT.jar

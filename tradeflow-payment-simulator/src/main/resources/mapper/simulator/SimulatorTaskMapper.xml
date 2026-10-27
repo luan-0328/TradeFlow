@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.paymentsimulator.infrastructure.SimulatorTaskMapper">
+  <resultMap id="taskResult" type="com.tradeflow.paymentsimulator.domain.SimulatorRows$Task">
+    <constructor>
+      <arg column="task_no" name="taskNo" javaType="string"/>
+      <arg column="payment_no" name="paymentNo" javaType="string"/>
+      <arg column="state" name="state" javaType="string"/>
+      <arg column="attempt_count" name="attemptCount" javaType="_int"/>
+      <arg column="claim_version" name="claimVersion" javaType="_long"/>
+      <arg column="lease_owner" name="leaseOwner" javaType="string"/>
+      <arg column="payload" name="payload" javaType="string"/>
+      <arg column="deliveries_required" name="deliveriesRequired" javaType="_int"/>
+      <arg column="deliveries_done" name="deliveriesDone" javaType="_int"/>
+    </constructor>
+  </resultMap>
+
+  <select id="next" resultMap="taskResult">
+    SELECT task_no,payment_no,state,attempt_count,claim_version,lease_owner,payload,deliveries_required,deliveries_done
+    FROM ${tableName}
+    WHERE (state='READY'
+      AND next_retry_at&lt;=UTC_TIMESTAMP(3))
+      OR (state='RUNNING'
+      AND lease_until&lt;UTC_TIMESTAMP(3))
+    ORDER BY id
+    LIMIT 1 FOR UPDATE SKIP LOCKED
+  </select>
+
+  <update id="claim">
+    UPDATE ${tableName}
+    SET state='RUNNING',attempt_count=attempt_count+1,claim_version=claim_version+1,lease_owner=#{leaseOwner},lease_until=UTC_TIMESTAMP(3)+INTERVAL 30 SECOND
+    WHERE task_no=#{taskNo}
+  </update>
+
+  <select id="fence" resultMap="taskResult">
+    SELECT task_no,payment_no,state,attempt_count,claim_version,lease_owner,payload,deliveries_required,deliveries_done
+    FROM ${tableName}
+    WHERE task_no=#{taskNo}
+      AND state='RUNNING'
+      AND claim_version=#{claimVersion}
+      AND lease_owner=#{leaseOwner}
+      AND lease_until&gt;UTC_TIMESTAMP(3) FOR UPDATE
+  </select>
+
+  <update id="complete">
+    UPDATE ${tableName}
+    SET state=CASE WHEN deliveries_done+1&gt;=deliveries_required THEN 'SUCCEEDED' ELSE 'READY' END,deliveries_done=deliveries_done+1,lease_owner=NULL,lease_until=NULL,next_retry_at=UTC_TIMESTAMP(3)+INTERVAL 1 SECOND,last_error=NULL
+    WHERE task_no=#{taskNo}
+      AND claim_version=#{claimVersion}
+      AND lease_owner=#{leaseOwner}
+  </update>
+
+  <update id="retry">
+    UPDATE ${tableName}
+    SET state=CASE WHEN attempt_count&gt;=30 THEN 'MANUAL_REVIEW' ELSE 'READY' END,lease_owner=NULL,lease_until=NULL,next_retry_at=TIMESTAMPADD(SECOND,#{retryDelaySeconds},UTC_TIMESTAMP(3)),last_error=#{lastError}
+    WHERE task_no=#{taskNo}
+      AND claim_version=#{claimVersion}
+      AND lease_owner=#{leaseOwner}
+  </update>
+</mapper>

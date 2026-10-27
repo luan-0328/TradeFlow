@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.user.infrastructure.LoginRateMapper">
+  <!-- 保留原SQL的事务前提、条件更新、锁顺序及租约围栏；业务说明见Mapper方法中文注释。 -->
+  <insert id="attempt">
+    INSERT INTO login_rate_limit(attempt_key,window_started_at,attempts)
+    VALUES(#{attemptKey},UTC_TIMESTAMP(3),1)
+    ON DUPLICATE KEY UPDATE attempts=IF(window_started_at&lt;=UTC_TIMESTAMP(3)-INTERVAL 15 MINUTE,1,LEAST(attempts+1,11)),window_started_at=IF(window_started_at&lt;=UTC_TIMESTAMP(3)-INTERVAL 15 MINUTE,UTC_TIMESTAMP(3),window_started_at)
+  </insert>
+
+  <select id="attempts" resultType="_int">
+    SELECT attempts
+    FROM login_rate_limit
+    WHERE attempt_key=#{attemptKey}
+  </select>
+
+  <delete id="cleanup">
+    DELETE
+    FROM login_rate_limit
+    WHERE window_started_at &lt; UTC_TIMESTAMP(3)-INTERVAL 7 DAY
+    LIMIT 500
+  </delete>
+</mapper>

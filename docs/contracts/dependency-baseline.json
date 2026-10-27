@@ -1,0 +1,51 @@
+{
+  "spring-boot": {
+    "version": "3.5.16",
+    "source": "https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-dependencies/maven-metadata.xml"
+  },
+  "spring-cloud": {
+    "version": "2025.0.3",
+    "source": "https://repo.maven.apache.org/maven2/org/springframework/cloud/spring-cloud-dependencies/maven-metadata.xml"
+  },
+  "mybatis-plus": {
+    "version": "3.5.17",
+    "source": "https://repo.maven.apache.org/maven2/com/baomidou/mybatis-plus-spring-boot3-starter/maven-metadata.xml"
+  },
+  "spring-cloud-alibaba": {
+    "version": "2025.0.0.0",
+    "source": "https://repo.maven.apache.org/maven2/com/alibaba/cloud/spring-cloud-alibaba-dependencies/2025.0.0.0/spring-cloud-alibaba-dependencies-2025.0.0.0.pom",
+    "properties": {
+      "maven-gpg-plugin.version": "3.2.7",
+      "central.publishing.maven.version": "0.7.0",
+      "flatten-maven-plugin.version": "1.7.0",
+      "maven-javadoc-plugin.version": "3.11.2",
+      "fastjson.version": "2.0.58",
+      "schedulerx.worker.version": "1.13.1",
+      "mybatis.version": "3.0.5",
+      "sentinel.version": "1.8.9",
+      "maven.compiler.source": "17",
+      "shedlock.version": "5.10.0",
+      "revision": "2025.0.0.0",
+      "log4j-core.version": "2.25.1",
+      "maven-source-plugin.version": "3.2.1",
+      "slf4j-api.version": "2.0.17",
+      "guava.version": "33.4.8-jre",
+      "nacos.client.version": "3.0.3",
+      "seata.version": "2.5.0",
+      "rocketmq.version": "5.3.1",
+      "log4j-slf4j2-impl.version": "2.25.1",
+      "lombok.version": "1.18.38",
+      "maven.compiler.target": "17",
+      "druid.version": "1.2.27"
+    }
+  },
+  "java": {
+    "version": "21",
+    "scope": "项目语言基线"
+  },
+  "mysql": {
+    "version": "8.0.46",
+    "scope": "本轮真实执行版本"
+  },
+  "verification": "来源声明与包版本存在性已核对；尚未初始化 Spring 工程进行构建或服务集成验证。"
+}

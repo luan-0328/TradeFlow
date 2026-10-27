@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.order.infrastructure.TaskMapper">
+  <!-- 保留原SQL的事务前提、条件更新、锁顺序及租约围栏；业务说明见Mapper方法中文注释。 -->
+  <resultMap id="taskResult" type="com.tradeflow.order.domain.OrderRows$Task">
+    <constructor>
+      <arg column="task_no" name="taskNo" javaType="java.lang.String"/>
+      <arg column="business_no" name="businessNo" javaType="java.lang.String"/>
+      <arg column="state" name="state" javaType="java.lang.String"/>
+      <arg column="attempt_count" name="attemptCount" javaType="_int"/>
+      <arg column="claim_version" name="claimVersion" javaType="_long"/>
+      <arg column="lease_owner" name="leaseOwner" javaType="java.lang.String"/>
+      <arg column="lease_until" name="leaseUntil" javaType="java.time.Instant"/>
+      <arg column="created_at" name="createdAt" javaType="java.time.Instant"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="taskViewResult" type="com.tradeflow.order.api.OrderModels$TaskView">
+    <constructor>
+      <arg column="task_no" name="taskNo" javaType="java.lang.String"/>
+      <arg column="business_no" name="businessNo" javaType="java.lang.String"/>
+      <arg column="state" name="state" javaType="java.lang.String"/>
+      <arg column="attempt_count" name="attemptCount" javaType="_int"/>
+      <arg column="next_retry_at" name="nextRetryAt" javaType="java.time.Instant"/>
+      <arg column="last_error" name="lastError" javaType="java.lang.String"/>
+      <arg column="claim_version" name="claimVersion" javaType="_long"/>
+      <arg column="lease_until" name="leaseUntil" javaType="java.time.Instant"/>
+    </constructor>
+  </resultMap>
+
+  <!-- 领取候选：只访问订单库process_task，不查询商品库存或支付库。
+       READY必须到期才处理，RUNNING只允许租约已过期时接管；FOR UPDATE锁持续到领取事务结束。
+       SKIP LOCKED跳过其他执行者锁住的行，避免所有Worker阻塞等待同一任务。
+       retry_cycle_started_at映射为Task.createdAt，用于计算本轮恢复预算，不是重新生成订单创建时间。 -->
+  <select id="next" resultMap="taskResult">
+    SELECT task_no,business_no,state,attempt_count,claim_version,lease_owner,lease_until,retry_cycle_started_at created_at
+    FROM process_task
+    WHERE task_type='CREATE_ORDER' AND ((state='READY' AND next_retry_at&lt;=UTC_TIMESTAMP(3)) OR (state='RUNNING' AND lease_until&lt;UTC_TIMESTAMP(3)))
+    ORDER BY id
+    LIMIT 1 FOR UPDATE SKIP LOCKED
+  </select>
+
+  <!-- 与next在同一短事务执行：只更新已锁候选，登记本次执行者、30秒租约及新的领取版本。
+       UPDATE自身不提交事务；后续byNo读回新快照，再由调用方事务提交后执行远程调用。 -->
+  <update id="claim">
+    UPDATE process_task
+    SET state='RUNNING',lease_owner=#{leaseOwner},lease_until=UTC_TIMESTAMP(3)+INTERVAL 30 SECOND,attempt_count=attempt_count+1,claim_version=claim_version+1,version=version+1
+    WHERE task_no=#{taskNo}
+  </update>
+
+  <!-- 写业务结果前重新锁原任务并验证有效执行权。旧执行者、旧版本或过期租约均匹配不到，调用方放弃写回。 -->
+  <select id="fence" resultMap="taskResult">
+    SELECT task_no,business_no,state,attempt_count,claim_version,lease_owner,lease_until,retry_cycle_started_at created_at
+    FROM process_task
+    WHERE task_no=#{taskNo} AND state='RUNNING' AND lease_owner=#{leaseOwner} AND claim_version=#{claimVersion} AND lease_until&gt;UTC_TIMESTAMP(3) FOR UPDATE
+  </select>
+
+  <!-- 按任务编号读取process_task快照，不加FOR UPDATE；不能把普通查询结果当成仍持有执行权的证明。 -->
+  <select id="byNo" resultMap="taskResult">
+    SELECT task_no,business_no,state,attempt_count,claim_version,lease_owner,lease_until,retry_cycle_started_at created_at
+    FROM process_task
+    WHERE task_no=#{taskNo}
+  </select>
+
+  <select id="byOrder" resultMap="taskResult">
+    SELECT task_no,business_no,state,attempt_count,claim_version,lease_owner,lease_until,retry_cycle_started_at created_at
+    FROM process_task
+    WHERE task_type='CREATE_ORDER' AND business_no=#{businessNo} AND step='QUOTE_STOCK'
+  </select>
+
+  <update id="finish">
+    UPDATE process_task
+    SET state='SUCCEEDED',lease_owner=NULL,lease_until=NULL,last_error=NULL,version=version+1
+    WHERE task_no=#{taskNo} AND state='RUNNING' AND lease_owner=#{leaseOwner} AND claim_version=#{claimVersion}
+  </update>
+
+  <update id="retry">
+    UPDATE process_task
+    SET state='READY',lease_owner=NULL,lease_until=NULL,next_retry_at=TIMESTAMPADD(SECOND,#{retryDelaySeconds},UTC_TIMESTAMP(3)),last_error=#{lastError},version=version+1
+    WHERE task_no=#{taskNo} AND state='RUNNING' AND lease_owner=#{leaseOwner} AND claim_version=#{claimVersion}
+  </update>
+
+  <update id="manual">
+    UPDATE process_task
+    SET state='MANUAL_REVIEW',manual_review_at=UTC_TIMESTAMP(3),last_error=#{lastError},lease_owner=NULL,lease_until=NULL,version=version+1
+    WHERE task_no=#{taskNo}
+  </update>
+
+  <select id="lock" resultMap="taskResult">
+    SELECT task_no,business_no,state,attempt_count,claim_version,lease_owner,lease_until,retry_cycle_started_at created_at
+    FROM process_task
+    WHERE task_no=#{taskNo} AND task_type='CREATE_ORDER' FOR UPDATE
+  </select>
+
+  <update id="restart">
+    UPDATE process_task
+    SET state='READY',attempt_count=0,claim_version=claim_version+1,lease_owner=NULL,lease_until=NULL,next_retry_at=UTC_TIMESTAMP(3),retry_cycle_started_at=UTC_TIMESTAMP(3),manual_review_at=NULL,last_error=NULL,version=version+1
+    WHERE task_no=#{taskNo} AND state='MANUAL_REVIEW'
+  </update>
+
+  <select id="lockByOrder" resultMap="taskResult">
+    SELECT task_no,business_no,state,attempt_count,claim_version,lease_owner,lease_until,retry_cycle_started_at created_at
+    FROM process_task
+    WHERE task_type='CREATE_ORDER' AND business_no=#{businessNo} AND step='QUOTE_STOCK' FOR UPDATE
+  </select>
+
+  <update id="activate">
+    UPDATE process_task
+    SET state='READY',attempt_count=0,claim_version=claim_version+1,lease_owner=NULL,lease_until=NULL,next_retry_at=UTC_TIMESTAMP(3),retry_cycle_started_at=UTC_TIMESTAMP(3),manual_review_at=NULL,last_error=NULL,version=version+1
+    WHERE task_no=#{taskNo}
+  </update>
+
+  <select id="list" resultMap="taskViewResult">
+    SELECT task_no,business_no,state,attempt_count,next_retry_at,last_error,claim_version,lease_until
+    FROM process_task
+    WHERE task_type='CREATE_ORDER'
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="_long">
+    SELECT COUNT(*)
+    FROM process_task
+    WHERE task_type='CREATE_ORDER'
+  </select>
+</mapper>

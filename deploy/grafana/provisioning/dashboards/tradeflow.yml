@@ -1,0 +1,9 @@
+apiVersion: 1
+providers:
+  - name: TradeFlow
+    folder: TradeFlow
+    type: file
+    disableDeletion: true
+    editable: false
+    options:
+      path: __DASHBOARD_PATH__

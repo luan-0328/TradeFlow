@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.payment.infrastructure.RefundMapper">
+  <select id="reconciliationLedgerCount" resultType="int">
+    SELECT COUNT(*)
+    FROM payment_ledger
+    WHERE business_no=#{businessNo}
+      AND entry_type='REFUND_SUCCEEDED'
+  </select>
+
+  <select id="find" resultType="map">
+    SELECT *
+    FROM refund_order
+    WHERE refund_no=#{refundNo}
+  </select>
+
+  <select id="lock" resultType="map">
+    SELECT *
+    FROM refund_order
+    WHERE refund_no=#{refundNo} FOR UPDATE
+  </select>
+
+  <select id="account" resultType="map">
+    SELECT *
+    FROM refund_account
+    WHERE payment_no=#{paymentNo} FOR UPDATE
+  </select>
+
+  <insert id="source">
+    INSERT INTO refund_source(source_no,payment_no,order_no,source_type,authorized_cents,authorization_version,authorization_hash)
+    VALUES(#{authorization.sourceNo},#{authorization.paymentNo},#{authorization.orderNo},#{authorization.sourceType},#{authorization.amountCents},#{authorization.version},#{authorizationHash})
+    ON DUPLICATE KEY UPDATE source_no=source_no
+  </insert>
+
+  <select id="sourceLock" resultType="map">
+    SELECT *
+    FROM refund_source
+    WHERE source_no=#{sourceNo} FOR UPDATE
+  </select>
+
+  <update id="reserveAccount">
+    UPDATE refund_account
+    SET reserved_refund_cents=reserved_refund_cents+#{amountCents},version=version+1
+    WHERE payment_no=#{paymentNo}
+      AND #{amountCents}&gt;0
+      AND #{amountCents}&lt;=paid_amount_cents-succeeded_refund_cents-reserved_refund_cents
+  </update>
+
+  <update id="reserveSource">
+    UPDATE refund_source
+    SET reserved_cents=reserved_cents+#{amountCents},active_refund_no=#{refundNo},version=version+1
+    WHERE source_no=#{sourceNo}
+      AND active_refund_no IS NULL
+      AND #{amountCents}&gt;0
+      AND #{amountCents}&lt;=authorized_cents-reserved_cents-succeeded_cents
+  </update>
+
+  <insert id="insert">
+    INSERT INTO refund_order(refund_no,source_no,order_no,payment_no,amount_cents,currency)
+    VALUES(#{refundNo},#{sourceNo},#{orderNo},#{paymentNo},#{amountCents},#{currency})
+  </insert>
+
+  <update id="settleAccount">
+    UPDATE refund_account
+    SET reserved_refund_cents=reserved_refund_cents-#{amountCents},succeeded_refund_cents=succeeded_refund_cents+#{succeededRefundCents},version=version+1
+    WHERE payment_no=#{paymentNo}
+      AND reserved_refund_cents&gt;=#{amountCents}
+  </update>
+
+  <update id="settleSource">
+    UPDATE refund_source
+    SET reserved_cents=reserved_cents-#{amountCents},succeeded_cents=succeeded_cents+#{succeededCents},active_refund_no=NULL,version=version+1
+    WHERE source_no=#{sourceNo}
+      AND active_refund_no=#{refundNo}
+      AND reserved_cents&gt;=#{amountCents}
+  </update>
+
+  <update id="fact">
+    UPDATE refund_order
+    SET status=#{status},channel_refund_no=#{channelRefundNo},channel_version=#{channelVersion},channel_updated_at=#{updatedAt},succeeded_at=#{succeededAt},last_error=NULL,version=version+1
+    WHERE refund_no=#{refundNo}
+  </update>
+
+  <update id="issue">
+    UPDATE refund_order
+    SET review_required='YES',last_error=#{lastError},version=version+1
+    WHERE refund_no=#{refundNo}
+  </update>
+
+  <update id="unknown">
+    UPDATE refund_order
+    SET status=IF(channel_version=0,'UNKNOWN',status),last_error='通道结果未知，先查询原退款号',version=version+1
+    WHERE refund_no=#{refundNo}
+      AND status NOT IN ('SUCCEEDED','FAILED')
+      AND review_required='NO'
+  </update>
+
+  <insert id="ledger">
+    INSERT INTO payment_ledger(business_no,payment_no,refund_no,entry_type,direction,amount_cents,currency,occurred_at)
+    VALUES(#{refundNo},#{paymentNo},#{refundNo},'REFUND_SUCCEEDED','OUT',#{amountCents},#{currency},#{succeededAt})
+  </insert>
+
+  <insert id="task">
+    INSERT INTO process_task(task_no,task_type,business_no,step,payload,next_retry_at)
+    VALUES(#{taskNo},'REFUND',#{taskNo},'SUBMIT',JSON_OBJECT(),UTC_TIMESTAMP(3))
+  </insert>
+
+  <select id="due" resultType="map">
+    SELECT *
+    FROM process_task
+    WHERE task_type='REFUND'
+      AND ((state='READY'
+      AND next_retry_at&lt;=UTC_TIMESTAMP(3))
+      OR (state='RUNNING'
+      AND lease_until&lt;UTC_TIMESTAMP(3)))
+    ORDER BY id
+    LIMIT 1 FOR UPDATE SKIP LOCKED
+  </select>
+
+  <select id="fence" resultType="map">
+    SELECT *
+    FROM process_task
+    WHERE task_no=#{taskNo}
+      AND state='RUNNING'
+      AND claim_version=#{claimVersion}
+      AND lease_owner=#{leaseOwner}
+      AND lease_until&gt;UTC_TIMESTAMP(3) FOR UPDATE
+  </select>
+
+  <select id="dueEvent" resultType="map">
+    SELECT *
+    FROM outbox_event
+    WHERE aggregate_type='REFUND'
+      AND ((status='READY'
+      AND next_retry_at&lt;=UTC_TIMESTAMP(3))
+      OR (status='RUNNING'
+      AND lease_until&lt;UTC_TIMESTAMP(3)))
+    ORDER BY id
+    LIMIT 1 FOR UPDATE SKIP LOCKED
+  </select>
+
+  <insert id="outbox">
+    INSERT INTO outbox_event(event_id,aggregate_type,aggregate_id,aggregate_version,event_type,correlation_id,causation_id,trace_id,payload,next_retry_at)
+    VALUES(#{eventId},'REFUND',#{channelFact.refundNo},#{channelFact.channelVersion},#{eventType},#{channelFact.orderNo},#{channelFact.refundNo},#{eventId},#{payload},UTC_TIMESTAMP(3))
+  </insert>
+
+  <insert id="notification">
+    INSERT INTO channel_notification(notification_no,business_no,notification_type,payload_hash,masked_payload,process_status)
+    VALUES(#{notificationNo},#{businessNo},'REFUND',#{payloadHash},'已验真退款事实',#{processStatus})
+  </insert>
+
+  <insert id="audit">
+    INSERT INTO audit_log(actor_type,actor_id,action,business_no,request_id,trace_id,reason,change_summary)
+    VALUES('SERVICE','payment',#{action},#{businessNo},#{requestId},#{requestId},#{reason},JSON_OBJECT('domain','REFUND'))
+  </insert>
+
+  <update id="finishEvent">
+    UPDATE outbox_event
+    SET status=#{status},published_at=IF(#{status}='SENT',UTC_TIMESTAMP(3),NULL),lease_until=NULL,next_retry_at=DATE_ADD(UTC_TIMESTAMP(3),INTERVAL 5 SECOND),last_error=#{lastError},version=version+1
+    WHERE event_id=#{eventId}
+      AND claim_version=#{claimVersion}
+      AND lease_owner=#{leaseOwner}
+      AND lease_until&gt;UTC_TIMESTAMP(3)
+      AND status='RUNNING'
+  </update>
+</mapper>

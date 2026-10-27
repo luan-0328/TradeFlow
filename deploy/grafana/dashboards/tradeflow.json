@@ -1,0 +1,575 @@
+{
+  "uid": "tradeflow",
+  "title": "TradeFlow · 本机只读可观测性",
+  "description": "初始演示阈值，非生产SLO；UNKNOWN与退款占用为原业务创建时长。NaN/缺失保持空白，不填零。",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "tags": [
+    "tradeflow"
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "HTTP请求率",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tradeflow-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(application) (rate(http_server_requests_seconds_count[5m]))",
+          "legendFormat": "{{__name__}} {{application}} {{kind}} {{queue}} {{pool}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "HTTP错误率",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tradeflow-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(application) (rate(http_server_requests_seconds_count{status=~\"5..\"}[5m])) / sum by(application) (rate(http_server_requests_seconds_count[5m]))",
+          "legendFormat": "{{__name__}} {{application}} {{kind}} {{queue}} {{pool}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "HTTP P95（直方图）",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tradeflow-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by(application,le) (rate(http_server_requests_seconds_bucket[5m])))",
+          "legendFormat": "{{__name__}} {{application}} {{kind}} {{queue}} {{pool}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "JVM堆内存",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tradeflow-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(application) (jvm_memory_used_bytes{area=\"heap\"})",
+          "legendFormat": "{{__name__}} {{application}} {{kind}} {{queue}} {{pool}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "JVM GC暂停",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tradeflow-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(application) (rate(jvm_gc_pause_seconds_sum[5m]))",
+          "legendFormat": "{{__name__}} {{application}} {{kind}} {{queue}} {{pool}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Hikari活动/等待连接",
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tradeflow-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "hikaricp_connections_active or hikaricp_connections_pending",
+          "legendFormat": "{{__name__}} {{application}} {{kind}} {{queue}} {{pool}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "业务积压（固定kind）",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tradeflow-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "tradeflow_business_backlog",
+          "legendFormat": "{{__name__}} {{application}} {{kind}} {{queue}} {{pool}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "最老未决创建时长",
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tradeflow-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "tradeflow_business_oldest_age_seconds",
+          "legendFormat": "{{__name__}} {{application}} {{kind}} {{queue}} {{pool}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "任务逾期时长",
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tradeflow-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "tradeflow_business_due_lag_seconds",
+          "legendFormat": "{{__name__}} {{application}} {{kind}} {{queue}} {{pool}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "UNKNOWN数量",
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tradeflow-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "tradeflow_business_backlog{kind=~\"payment_unknown|refund_unknown\"}",
+          "legendFormat": "{{__name__}} {{application}} {{kind}} {{queue}} {{pool}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "退款额度占用创建时长",
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tradeflow-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "tradeflow_business_oldest_age_seconds{kind=\"refund_reserved\"}",
+          "legendFormat": "{{__name__}} {{application}} {{kind}} {{queue}} {{pool}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "实例行锁等待（共享实例取max）",
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tradeflow-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(tradeflow_database_row_lock_waits{scope=\"instance\"})",
+          "legendFormat": "{{__name__}} {{application}} {{kind}} {{queue}} {{pool}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "未解决完整性冲突",
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tradeflow-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "tradeflow_business_backlog{kind=\"reconciliation_conflict\"}",
+          "legendFormat": "{{__name__}} {{application}} {{kind}} {{queue}} {{pool}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Rabbit队列积压",
+      "gridPos": {
+        "x": 12,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tradeflow-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "tradeflow_rabbitmq_queue_messages",
+          "legendFormat": "{{__name__}} {{application}} {{kind}} {{queue}} {{pool}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "DLQ积压",
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tradeflow-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "tradeflow_rabbitmq_queue_messages{queue=~\".*[.]dlq\"}",
+          "legendFormat": "{{__name__}} {{application}} {{kind}} {{queue}} {{pool}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "采样成功状态",
+      "gridPos": {
+        "x": 12,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tradeflow-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "tradeflow_metrics_collection_success or tradeflow_rabbitmq_collection_success",
+          "legendFormat": "{{__name__}} {{application}} {{kind}} {{queue}} {{pool}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "距最后成功采样",
+      "gridPos": {
+        "x": 0,
+        "y": 64,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tradeflow-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(time() - tradeflow_metrics_last_success_unixtime_seconds) or (time() - tradeflow_rabbitmq_last_success_unixtime_seconds)",
+          "legendFormat": "{{__name__}} {{application}} {{kind}} {{queue}} {{pool}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "目标在线",
+      "gridPos": {
+        "x": 12,
+        "y": 64,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tradeflow-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=~\"tradeflow-.*\"}",
+          "legendFormat": "{{__name__}} {{application}} {{kind}} {{queue}} {{pool}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

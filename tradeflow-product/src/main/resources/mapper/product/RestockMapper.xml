@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.product.infrastructure.RestockMapper">
+    <resultMap id="RestockViewMap" type="com.tradeflow.contracts.RefundContracts$RestockView">
+        <constructor>
+            <arg column="receipt_no" javaType="java.lang.String"/>
+            <arg column="order_no" javaType="java.lang.String"/>
+            <arg column="reservation_no" javaType="java.lang.String"/>
+            <arg column="source_no" javaType="java.lang.String"/>
+            <arg column="status" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <select id="byReservation" resultMap="RestockViewMap">
+        SELECT receipt_no,order_no,reservation_no,source_no,'APPLIED' status FROM unshipped_restock WHERE reservation_no=#{reservationNo}
+    </select>
+
+    <insert id="insert">
+        INSERT INTO unshipped_restock(receipt_no,order_no,reservation_no,source_no) VALUES(#{receiptNo},#{orderNo},#{reservationNo},#{sourceNo})
+    </insert>
+</mapper>

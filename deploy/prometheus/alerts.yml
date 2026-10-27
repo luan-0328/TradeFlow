@@ -1,0 +1,88 @@
+# 初始演示阈值，未经压测，不代表生产SLO；无外部通知接收器。
+groups:
+  - name: tradeflow-initial
+    rules:
+      - alert: TradeFlowRabbitTopologyDrift
+        expr: tradeflow_rabbitmq_topology_valid == 0 or absent(tradeflow_rabbitmq_topology_valid)
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "RabbitMQ预期交换机、队列或绑定缺失"
+      - alert: TradeFlowTargetMissing
+        expr: up{job=~"tradeflow-.*"} == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "管理指标目标不可达"
+      - alert: TradeFlowExpectedTargetsMissing
+        expr: count(up{job="tradeflow-applications"}) != 7 or absent(up{job="tradeflow-applications"}) or absent(up{job="tradeflow-rabbitmq"})
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "预期监控目标缺失"
+      - alert: TradeFlowOutboxOld
+        expr: tradeflow_business_oldest_age_seconds{kind="outbox"} > 60
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Outbox最老未发送超过初始60秒阈值"
+      - alert: TradeFlowTaskOverdue
+        expr: tradeflow_business_due_lag_seconds > 300
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "任务逾期超过初始300秒阈值"
+      - alert: TradeFlowUnknownOld
+        expr: tradeflow_business_oldest_age_seconds{kind=~"payment_unknown|refund_unknown"} > 300
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "UNKNOWN原业务创建存续超过300秒"
+      - alert: TradeFlowIntegrityConflict
+        expr: tradeflow_business_backlog{kind=~"reconciliation_conflict|payment_frozen|refund_frozen"} > 0
+        for: 0s
+        labels:
+          severity: warning
+        annotations:
+          summary: "未解决金额币种或完整性冲突"
+      - alert: TradeFlowDlqNonEmpty
+        expr: tradeflow_rabbitmq_queue_messages{queue=~".*[.]dlq"} > 0
+        for: 0s
+        labels:
+          severity: warning
+        annotations:
+          summary: "死信队列非空"
+      - alert: TradeFlowBusinessSamplingFailed
+        expr: tradeflow_metrics_collection_success{collector="business"} == 0 or absent(tradeflow_metrics_collection_success{collector="business",application="tradeflow-user"}) or absent(tradeflow_metrics_collection_success{collector="business",application="tradeflow-product"}) or absent(tradeflow_metrics_collection_success{collector="business",application="tradeflow-order"}) or absent(tradeflow_metrics_collection_success{collector="business",application="tradeflow-payment"}) or absent(tradeflow_metrics_collection_success{collector="business",application="tradeflow-aftersale"}) or absent(tradeflow_metrics_collection_success{collector="business",application="tradeflow-payment-simulator"})
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "业务只读采样失败或缺失"
+      - alert: TradeFlowBusinessSamplingStale
+        expr: time() - tradeflow_metrics_last_success_unixtime_seconds{collector="business"} > 90
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "业务指标成功采样陈旧"
+      - alert: TradeFlowRabbitSamplingFailed
+        expr: tradeflow_rabbitmq_collection_success == 0 or absent(tradeflow_rabbitmq_collection_success)
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Rabbit只读采样失败或缺失"
+      - alert: TradeFlowRabbitSamplingStale
+        expr: time() - tradeflow_rabbitmq_last_success_unixtime_seconds > 90
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Rabbit成功采样陈旧"

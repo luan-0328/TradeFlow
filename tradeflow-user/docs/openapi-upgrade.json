@@ -1,0 +1,1621 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TradeFlow user U1-U4 扩展请求契约",
+    "version": "0.3.0",
+    "description": "配套文档 upgrade-u1-u4.md 包含响应data精确字段及权限/事务规则。本文件不替代全仓既有契约。 P0每商家独立职级契约已同步；源码契约不代表P0全链路、并发或部署验收已通过。"
+  },
+  "paths": {
+    "/api/v1/users/me/password": {
+      "post": {
+        "summary": "POST /api/v1/users/me/password",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/sessions/revoke-all": {
+      "post": {
+        "summary": "POST /api/v1/users/me/sessions/revoke-all",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/addresses": {
+      "get": {
+        "summary": "GET /api/v1/users/me/addresses",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/v1/users/me/addresses",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddressInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/addresses/{id}": {
+      "get": {
+        "summary": "GET /api/v1/users/me/addresses/{id}",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        }
+      },
+      "put": {
+        "summary": "PUT /api/v1/users/me/addresses/{id}",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddressInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "DELETE /api/v1/users/me/addresses/{id}",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/notifications": {
+      "get": {
+        "summary": "GET /api/v1/users/me/notifications",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/notifications/{id}/read": {
+      "post": {
+        "summary": "POST /api/v1/users/me/notifications/{id}/read",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        }
+      }
+    },
+    "/api/v1/merchant-applications": {
+      "post": {
+        "summary": "POST /api/v1/merchant-applications",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MerchantApply"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "GET /api/v1/merchant-applications",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/merchant-applications": {
+      "get": {
+        "summary": "GET /api/v1/admin/merchant-applications",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/merchant-applications/{id}/review": {
+      "post": {
+        "summary": "POST /api/v1/admin/merchant-applications/{id}/review",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MerchantReview"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/merchants": {
+      "get": {
+        "summary": "GET /api/v1/merchants",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OwnedMerchantView"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        }
+      }
+    },
+    "/api/v1/merchants/{id}": {
+      "get": {
+        "summary": "GET /api/v1/merchants/{id}",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^merchant_[a-z0-9_]{1,48}$"
+            }
+          },
+          {
+            "name": "X-Merchant-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^merchant_[a-z0-9_]{1,48}$"
+            },
+            "description": "服务端验证必须等于路径且包含于最新有效成员归属"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        }
+      },
+      "patch": {
+        "summary": "PATCH /api/v1/merchants/{id}",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^merchant_[a-z0-9_]{1,48}$"
+            }
+          },
+          {
+            "name": "X-Merchant-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^merchant_[a-z0-9_]{1,48}$"
+            },
+            "description": "服务端验证必须等于路径且包含于最新有效成员归属"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MerchantProfile"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/merchants/{id}/members": {
+      "get": {
+        "summary": "GET /api/v1/merchants/{id}/members",
+        "description": "仅当前路径及X-Merchant-Id对应商家的有效ADMIN。A店ADMIN不能凭B店OPERATOR身份维护B成员。职级/状态变更、目标Token撤销与审计同事务；最后有效ADMIN返回409 LAST_MERCHANT_ADMIN。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^merchant_[a-z0-9_]{1,48}$"
+            }
+          },
+          {
+            "name": "X-Merchant-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^merchant_[a-z0-9_]{1,48}$"
+            },
+            "description": "服务端验证必须等于路径且包含于最新有效成员归属"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MerchantMemberView"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "LAST_MERCHANT_ADMIN：不能降级或停用最后有效管理员；失败整体回滚"
+          }
+        },
+        "x-merchant-roles": [
+          "ADMIN"
+        ]
+      },
+      "put": {
+        "summary": "PUT /api/v1/merchants/{id}/members",
+        "description": "仅当前路径及X-Merchant-Id对应商家的有效ADMIN。A店ADMIN不能凭B店OPERATOR身份维护B成员。职级/状态变更、目标Token撤销与审计同事务；最后有效ADMIN返回409 LAST_MERCHANT_ADMIN。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^merchant_[a-z0-9_]{1,48}$"
+            }
+          },
+          {
+            "name": "X-Merchant-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^merchant_[a-z0-9_]{1,48}$"
+            },
+            "description": "服务端验证必须等于路径且包含于最新有效成员归属"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MerchantMemberView"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "LAST_MERCHANT_ADMIN：不能降级或停用最后有效管理员；失败整体回滚"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MerchantMember"
+              }
+            }
+          }
+        },
+        "x-merchant-roles": [
+          "ADMIN"
+        ]
+      }
+    },
+    "/api/v1/admin/merchants": {
+      "get": {
+        "summary": "GET /api/v1/admin/merchants",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/merchants/{id}/status": {
+      "patch": {
+        "summary": "PATCH /api/v1/admin/merchants/{id}/status",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^merchant_[a-z0-9_]{1,48}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MerchantState"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/audits": {
+      "get": {
+        "summary": "GET /api/v1/admin/audits",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "actorId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "businessNo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        }
+      }
+    },
+    "/internal/v1/merchants/{id}": {
+      "get": {
+        "summary": "GET /internal/v1/merchants/{id}",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Caller": [],
+            "ServiceToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^merchant_[a-z0-9_]{1,48}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        }
+      }
+    },
+    "/internal/v1/users/{id}/notifications": {
+      "post": {
+        "summary": "POST /internal/v1/users/{id}/notifications",
+        "description": "响应字段、权限、状态、并发和迁移细则见 upgrade-u1-u4.md；统一ApiResponse信封。",
+        "security": [
+          {
+            "Caller": [],
+            "ServiceToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功，data精确对象见配套契约说明"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "身份无效"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "资源不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "版本或状态冲突"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationInput"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PasswordChange": {
+        "type": "object",
+        "properties": {
+          "oldPassword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "writeOnly": true
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 72,
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "oldPassword",
+          "newPassword"
+        ]
+      },
+      "AddressInput": {
+        "type": "object",
+        "properties": {
+          "recipient": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "defaultAddress": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "region": {
+            "type": "string",
+            "maxLength": 255,
+            "default": "",
+            "description": "省市区；兼容旧输入缺省空，新页面必须填写"
+          }
+        },
+        "required": [
+          "recipient",
+          "phone",
+          "address",
+          "defaultAddress",
+          "version"
+        ]
+      },
+      "MerchantApply": {
+        "type": "object",
+        "properties": {
+          "merchantId": {
+            "type": "string",
+            "pattern": "^merchant_[a-z0-9_]{1,48}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "merchantId",
+          "name",
+          "description"
+        ]
+      },
+      "MerchantReview": {
+        "type": "object",
+        "properties": {
+          "approved": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "approved",
+          "reason",
+          "version"
+        ]
+      },
+      "MerchantProfile": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "version"
+        ]
+      },
+      "MerchantState": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DISABLED"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "status",
+          "reason",
+          "version"
+        ]
+      },
+      "MerchantMember": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "merchantId": {
+            "type": "string",
+            "pattern": "^merchant_[a-z0-9_]{1,48}$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DISABLED"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "role": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "ADMIN",
+              "OPERATOR",
+              null
+            ],
+            "description": "本店独立职级；省略或null兼容旧请求时归一为OPERATOR，不保留或继承旧全局商家管理员职级",
+            "default": "OPERATOR"
+          }
+        },
+        "required": [
+          "userId",
+          "merchantId",
+          "status",
+          "reason"
+        ],
+        "description": "平台专用入口或本店ADMIN可管理；省略role默认OPERATOR，已有管理员的旧式更新可能形成降级，最后有效ADMIN受409保护。"
+      },
+      "NotificationInput": {
+        "type": "object",
+        "properties": {
+          "businessKey": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_:.-]{1,120}$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "businessKey",
+          "title",
+          "content"
+        ]
+      },
+      "MerchantRoles": {
+        "type": "object",
+        "propertyNames": {
+          "pattern": "^merchant_[a-z0-9_]{1,48}$"
+        },
+        "additionalProperties": {
+          "type": "string",
+          "enum": [
+            "ADMIN",
+            "OPERATOR"
+          ],
+          "description": "本商家独立职级；不由全局MERCHANT_ADMIN/MERCHANT_OPERATOR推断"
+        },
+        "description": "当前有效成员的商家ID到本店职级；停用商家仍保留历史处置身份，停用成员不返回"
+      },
+      "MerchantMemberView": {
+        "type": "object",
+        "required": [
+          "userId",
+          "status",
+          "role",
+          "version"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DISABLED"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "OPERATOR"
+            ],
+            "description": "本商家独立职级；不由全局MERCHANT_ADMIN/MERCHANT_OPERATOR推断"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "MerchantRole": {
+        "type": "string",
+        "enum": [
+          "ADMIN",
+          "OPERATOR"
+        ],
+        "description": "本商家独立职级；不由全局MERCHANT_ADMIN/MERCHANT_OPERATOR推断"
+      },
+      "AuthContext": {
+        "type": "object",
+        "required": [
+          "userId",
+          "status",
+          "roles",
+          "merchantIds",
+          "tokenVersion",
+          "merchantRoles"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DISABLED"
+            ]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "全局角色USER/PLATFORM_ADMIN；旧商家角色只为历史兼容保留，不作为商家授权"
+          },
+          "merchantIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "有效成员且商家存在的ID；只供选择，具体职级须查merchantRoles"
+          },
+          "tokenVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "merchantRoles": {
+            "$ref": "#/components/schemas/MerchantRoles"
+          }
+        },
+        "additionalProperties": false,
+        "description": "用户服务权威快照；旧五参Java构造器仅为源码兼容并生成空merchantRoles，绝不推断或授予商家权限。生产快照读取merchant_member.role。"
+      },
+      "Capabilities": {
+        "type": "object",
+        "required": [
+          "userId",
+          "roles",
+          "merchantIds",
+          "allowedActions",
+          "merchantRoles"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "全局角色USER/PLATFORM_ADMIN；旧商家角色只为历史兼容保留，不作为商家授权"
+          },
+          "merchantIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "有效成员且商家存在的ID；只供选择，具体职级须查merchantRoles"
+          },
+          "merchantRoles": {
+            "$ref": "#/components/schemas/MerchantRoles"
+          },
+          "allowedActions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "按有效本店职级聚合必要导航；存在任一ADMIN可展示管理入口，实际动作仍校验所选商家role，不能授予其它店管理权限"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnedMerchantView": {
+        "type": "object",
+        "required": [
+          "merchantId",
+          "name",
+          "description",
+          "status",
+          "version",
+          "role"
+        ],
+        "properties": {
+          "merchantId": {
+            "type": "string",
+            "pattern": "^merchant_[a-z0-9_]{1,48}$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DISABLED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "OPERATOR"
+            ],
+            "description": "本商家独立职级；不由全局MERCHANT_ADMIN/MERCHANT_OPERATOR推断"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "Caller": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Caller-Service"
+      },
+      "ServiceToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Service-Token"
+      }
+    }
+  },
+  "x-merchant-authorization": {
+    "source": "AuthContext.merchantRoles[selectedMerchantId]",
+    "administrator": "ADMIN",
+    "operator": "OPERATOR",
+    "legacyJavaConstructor": "五参构造器merchantRoles为空，不推断权限；缺少权威本店职级拒绝商家操作",
+    "globalRoles": "USER/PLATFORM_ADMIN保持全局；旧MERCHANT_ADMIN/MERCHANT_OPERATOR不构成商家权限",
+    "navigation": "capabilities.allowedActions只作跨有效商家聚合导航，写操作必须复核当前所选商家职级和资源归属",
+    "lastAdmin": {
+      "error": "LAST_MERCHANT_ADMIN",
+      "httpStatus": 409,
+      "definition": "账号ACTIVE且成员ACTIVE且role=ADMIN；商家经营停用不排除",
+      "protectedChanges": [
+        "成员降级",
+        "成员禁用",
+        "全局账号停用"
+      ],
+      "serialization": "authorization_guard锚点与账号锁串行；成员/角色写、目标Token撤销及审计同一用户库事务",
+      "recovery": "先给另一ACTIVE账号授本店ADMIN再移除原ADMIN；历史无有效ADMIN的店由平台专用/admin/merchant-members入口补授恢复"
+    },
+    "migration": {
+      "version": "V7__merchant_member_roles.sql",
+      "historicalBackfill": "有效成员且存在有效全局MERCHANT_ADMIN关联的历史成员回填ADMIN，其余OPERATOR；一次性历史兼容，不自动扩大未来成员职级",
+      "defaultForNewMember": "OPERATOR",
+      "approvedApplicationRole": "ADMIN"
+    }
+  }
+}

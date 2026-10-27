@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.order.infrastructure.OrderNotificationMapper">
+ <!-- 原日志不可变、orders.user_id为权威归属；不持久水位，避免自增ID提交空洞。 -->
+ <insert id="materialize">INSERT INTO order_notification_task(source_log_id,business_key,order_no,user_id,to_status)
+ SELECT l.id,CONCAT('order-status:',l.id),l.order_no,o.user_id,l.to_status
+ FROM order_status_log l JOIN orders o ON o.order_no=l.order_no
+ WHERE NOT EXISTS(SELECT 1 FROM order_notification_task t WHERE t.source_log_id=l.id)
+ ORDER BY l.id LIMIT 100 ON DUPLICATE KEY UPDATE source_log_id=source_log_id</insert>
+ <select id="page" resultType="map">SELECT CAST(id AS CHAR) AS id,CAST(source_log_id AS CHAR) AS source_log_id,business_key,order_no,user_id,to_status,state,attempt_count,claim_version,lease_until,next_retry_at,last_error,delivered_at,created_at FROM order_notification_task t ORDER BY t.id DESC LIMIT #{size} OFFSET #{offset}</select>
+ <select id="count" resultType="long">SELECT COUNT(*) FROM order_notification_task</select>
+ <select id="lock" resultType="map">SELECT * FROM order_notification_task WHERE id=#{id} FOR UPDATE</select>
+ <update id="restart">UPDATE order_notification_task SET state='READY',attempt_count=0,claim_version=claim_version+1,lease_owner=NULL,lease_until=NULL,next_retry_at=UTC_TIMESTAMP(3),last_error=NULL WHERE id=#{id} AND state='MANUAL_REVIEW'</update>
+ <select id="due" resultType="map">SELECT * FROM order_notification_task WHERE state='READY' AND next_retry_at&lt;=UTC_TIMESTAMP(3) AND (lease_until IS NULL OR lease_until&lt;=UTC_TIMESTAMP(3)) ORDER BY next_retry_at,id LIMIT 1 FOR UPDATE SKIP LOCKED</select>
+ <update id="claim">UPDATE order_notification_task SET lease_owner=#{owner},claim_version=claim_version+1,attempt_count=attempt_count+1,lease_until=TIMESTAMPADD(SECOND,60,UTC_TIMESTAMP(3)) WHERE id=#{id} AND state='READY' AND (lease_until IS NULL OR lease_until&lt;=UTC_TIMESTAMP(3))</update>
+ <update id="finish">UPDATE order_notification_task SET state=#{state},last_error=#{error},lease_until=NULL,delivered_at=CASE WHEN #{state}='SUCCEEDED' THEN UTC_TIMESTAMP(3) ELSE delivered_at END,next_retry_at=TIMESTAMPADD(SECOND,LEAST(3600,CAST(POW(2,LEAST(attempt_count,12)) AS SIGNED)),UTC_TIMESTAMP(3)) WHERE id=#{id} AND lease_owner=#{owner} AND claim_version=#{version} AND lease_until&gt;UTC_TIMESTAMP(3) AND state='READY'</update>
+</mapper>

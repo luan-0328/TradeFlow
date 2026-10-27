@@ -1,0 +1,12 @@
+# 交付包只包含已构建dist，不要求部署机器安装Node或获取前端构建依赖。
+FROM nginx:1.28.3-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236 AS runtime
+COPY deploy/web/nginx.conf /etc/nginx/nginx.conf
+USER nginx
+EXPOSE 8080
+ENTRYPOINT ["nginx", "-g", "daemon off;"]
+
+FROM runtime AS web-user
+COPY web-user/dist/ /usr/share/nginx/html/
+
+FROM runtime AS web-admin
+COPY web-admin/dist/ /usr/share/nginx/html/

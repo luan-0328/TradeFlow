@@ -1,0 +1,299 @@
+# 统一Nacos服务发现：dev/prod必须注册；test仅隔离注册，无服务直连回退。
+# Nacos配置中心独立开关；namespace/group须一致，注册地址必须可被调用方访问。
+server:
+  port: ${SERVER_PORT:8082}
+  shutdown: graceful
+spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+  application:
+    name: tradeflow-product
+  profiles:
+    default: dev
+  lifecycle:
+    timeout-per-shutdown-phase: 15s
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  cloud:
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:18848}
+      username: ${NACOS_USERNAME:}
+      password: ${NACOS_PASSWORD:}
+      config:
+        enabled: ${TRADEFLOW_NACOS_CONFIG_ENABLED:false}
+        import-check:
+          enabled: false
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:TRADEFLOW}
+      discovery:
+        enabled: true
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:TRADEFLOW}
+        ip: ${NACOS_DISCOVERY_IP:127.0.0.1}
+    sentinel:
+      enabled: false
+    loadbalancer:
+      retry:
+        enabled: false
+    openfeign:
+      client:
+        config:
+          default:
+            connectTimeout: 1000
+            readTimeout: 3000
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:16379}
+      password: ${REDIS_PASSWORD:}
+      connect-timeout: 300ms
+      timeout: 300ms
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+  rabbitmq:
+    dynamic: false
+management:
+  server:
+    port: ${MANAGEMENT_SERVER_PORT:18082}
+    address: ${MANAGEMENT_BIND_ADDRESS:127.0.0.1}
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 50ms,100ms,300ms,1s,3s
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db
+      show-details: never
+      probes:
+        enabled: true
+info:
+  app:
+    stage: B8_OBSERVABILITY_UNTESTED
+tradeflow:
+  monitoring-token: ${TRADEFLOW_MONITORING_TOKEN}
+  observability:
+    enabled: true
+  service:
+    code: product
+    display-name: 商品库存服务
+    capabilities: module-info,health,api-docs,products,sku,quotes,inventory-adjustment,reservations,release-tombstones,received-return-restock
+  security:
+    public-key: ${TRADEFLOW_JWT_PUBLIC_KEY}
+    issuer: ${TRADEFLOW_JWT_ISSUER:tradeflow}
+  internal:
+    product-token: ${TRADEFLOW_PRODUCT_SERVICE_TOKEN}
+    order-token: ${TRADEFLOW_ORDER_SERVICE_TOKEN}
+springdoc:
+  swagger-ui:
+    disable-swagger-default-url: true
+    operations-sorter: alpha
+logging:
+  structured:
+    format:
+      console: logstash
+    json:
+      add:
+        service: ${spring.application.name}
+  pattern:
+    level: '%5p [requestId=%X{requestId:-} traceId=%X{traceId:-}]'
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    arg-name-based-constructor-auto-mapping: true
+---
+server:
+  address: 127.0.0.1
+spring:
+  autoconfigure:
+    exclude:
+    - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  config:
+    activate:
+      on-profile: dev
+    import: ${NACOS_CONFIG_IMPORT:}
+  cloud:
+    sentinel:
+      enabled: ${TRADEFLOW_SENTINEL_ENABLED:false}
+      eager: true
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:18871}
+        client-ip: 127.0.0.1
+        port: 28721
+      datasource:
+        flow:
+          nacos:
+            server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:18848}
+            username: ${NACOS_USERNAME:}
+            password: ${NACOS_PASSWORD:}
+            group-id: TRADEFLOW
+            data-id: tradeflow-product-flow.json
+            data-type: json
+            rule-type: flow
+        degrade:
+          nacos:
+            server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:18848}
+            username: ${NACOS_USERNAME:}
+            password: ${NACOS_PASSWORD:}
+            group-id: TRADEFLOW
+            data-id: tradeflow-product-degrade.json
+            data-type: json
+            rule-type: degrade
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13316}/trade_product?useUnicode=true&characterEncoding=UTF-8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
+    username: ${TRADEFLOW_PRODUCT_DB_USER}
+    password: ${TRADEFLOW_PRODUCT_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+      connection-init-sql: SET time_zone = '+00:00'
+  flyway:
+    enabled: false
+management:
+  health:
+    redis:
+      enabled: false
+    rabbit:
+      enabled: false
+feign:
+  sentinel:
+    enabled: ${TRADEFLOW_SENTINEL_ENABLED:false}
+---
+server:
+  address: 127.0.0.1
+  port: 0
+spring:
+  autoconfigure:
+    exclude:
+    - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+    - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+    - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration
+    - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  config:
+    activate:
+      on-profile: test
+  cloud:
+    sentinel:
+      enabled: false
+    nacos:
+      discovery:
+        enabled: false
+        register-enabled: false
+      config:
+        enabled: false
+management:
+  server:
+    port: -1
+  endpoint:
+    health:
+      group:
+        readiness:
+          include: readinessState
+  health:
+    redis:
+      enabled: false
+    rabbit:
+      enabled: false
+tradeflow:
+  observability:
+    enabled: false
+---
+server:
+  address: ${BIND_ADDRESS:0.0.0.0}
+spring:
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/trade_product?useUnicode=true&characterEncoding=UTF-8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
+    username: ${TRADEFLOW_PRODUCT_DB_USER}
+    password: ${TRADEFLOW_PRODUCT_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 1
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+      connection-init-sql: SET time_zone = '+00:00'
+  flyway:
+    enabled: ${TRADEFLOW_MIGRATIONS_ENABLED:false}
+    locations: classpath:db/migration
+    validate-on-migrate: true
+    baseline-on-migrate: false
+    user: ${TRADEFLOW_PRODUCT_MIGRATION_USER}
+    password: ${TRADEFLOW_PRODUCT_MIGRATION_PASSWORD}
+  config:
+    import: ${NACOS_CONFIG_IMPORT:}
+    activate:
+      on-profile: prod
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connectTimeout: 1000
+            readTimeout: 3000
+    sentinel:
+      enabled: true
+      eager: true
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD}
+        client-ip: ${SENTINEL_CLIENT_IP}
+        port: 28721
+      datasource:
+        flow:
+          nacos:
+            server-addr: ${NACOS_SERVER_ADDR}
+            username: ${NACOS_USERNAME}
+            password: ${NACOS_PASSWORD}
+            group-id: TRADEFLOW
+            data-id: tradeflow-product-flow.json
+            data-type: json
+            rule-type: flow
+        degrade:
+          nacos:
+            server-addr: ${NACOS_SERVER_ADDR}
+            username: ${NACOS_USERNAME}
+            password: ${NACOS_PASSWORD}
+            group-id: TRADEFLOW
+            data-id: tradeflow-product-degrade.json
+            data-type: json
+            rule-type: degrade
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      discovery:
+        ip: ${NACOS_DISCOVERY_IP:}
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      connect-timeout: 300ms
+      timeout: 300ms
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    listener:
+      simple:
+        acknowledge-mode: manual
+        default-requeue-rejected: false
+feign:
+  sentinel:
+    enabled: true

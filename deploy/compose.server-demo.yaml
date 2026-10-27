@@ -1,0 +1,211 @@
+{
+  "services": {
+    "user": {
+      "entrypoint": [
+        "java",
+        "-Xms16m",
+        "-Xmx48m",
+        "-Xss512k",
+        "-XX:+UseSerialGC",
+        "-XX:TieredStopAtLevel=1",
+        "-XX:MaxMetaspaceSize=128m",
+        "-XX:ReservedCodeCacheSize=24m",
+        "-XX:MaxDirectMemorySize=8m",
+        "-XX:ActiveProcessorCount=1",
+        "-jar",
+        "/app/app.jar"
+      ],
+      "command": [
+        "--server.address=0.0.0.0",
+        "--management.server.address=0.0.0.0",
+        "--management.server.port=18081",
+        "--spring.datasource.hikari.maximum-pool-size=2",
+        "--spring.datasource.hikari.minimum-idle=1",
+        "--server.tomcat.threads.max=8",
+        "--server.tomcat.threads.min-spare=2"
+      ],
+      "mem_limit": "384m",
+      "memswap_limit": "768m"
+    },
+    "product": {
+      "entrypoint": [
+        "java",
+        "-Xms16m",
+        "-Xmx48m",
+        "-Xss512k",
+        "-XX:+UseSerialGC",
+        "-XX:TieredStopAtLevel=1",
+        "-XX:MaxMetaspaceSize=128m",
+        "-XX:ReservedCodeCacheSize=24m",
+        "-XX:MaxDirectMemorySize=8m",
+        "-XX:ActiveProcessorCount=1",
+        "-jar",
+        "/app/app.jar"
+      ],
+      "command": [
+        "--server.address=0.0.0.0",
+        "--management.server.address=0.0.0.0",
+        "--management.server.port=18082",
+        "--spring.datasource.hikari.maximum-pool-size=2",
+        "--spring.datasource.hikari.minimum-idle=1",
+        "--server.tomcat.threads.max=8",
+        "--server.tomcat.threads.min-spare=2"
+      ],
+      "mem_limit": "384m",
+      "memswap_limit": "768m"
+    },
+    "order": {
+      "entrypoint": [
+        "java",
+        "-Xms16m",
+        "-Xmx48m",
+        "-Xss512k",
+        "-XX:+UseSerialGC",
+        "-XX:TieredStopAtLevel=1",
+        "-XX:MaxMetaspaceSize=128m",
+        "-XX:ReservedCodeCacheSize=24m",
+        "-XX:MaxDirectMemorySize=8m",
+        "-XX:ActiveProcessorCount=1",
+        "-jar",
+        "/app/app.jar"
+      ],
+      "command": [
+        "--server.address=0.0.0.0",
+        "--management.server.address=0.0.0.0",
+        "--management.server.port=18083",
+        "--spring.datasource.hikari.maximum-pool-size=2",
+        "--spring.datasource.hikari.minimum-idle=1",
+        "--server.tomcat.threads.max=8",
+        "--server.tomcat.threads.min-spare=2"
+      ],
+      "mem_limit": "384m",
+      "memswap_limit": "768m"
+    },
+    "payment": {
+      "entrypoint": [
+        "java",
+        "-Xms16m",
+        "-Xmx48m",
+        "-Xss512k",
+        "-XX:+UseSerialGC",
+        "-XX:TieredStopAtLevel=1",
+        "-XX:MaxMetaspaceSize=128m",
+        "-XX:ReservedCodeCacheSize=24m",
+        "-XX:MaxDirectMemorySize=8m",
+        "-XX:ActiveProcessorCount=1",
+        "-jar",
+        "/app/app.jar"
+      ],
+      "command": [
+        "--server.address=0.0.0.0",
+        "--management.server.address=0.0.0.0",
+        "--management.server.port=18084",
+        "--spring.datasource.hikari.maximum-pool-size=2",
+        "--spring.datasource.hikari.minimum-idle=1",
+        "--server.tomcat.threads.max=8",
+        "--server.tomcat.threads.min-spare=2"
+      ],
+      "mem_limit": "384m",
+      "memswap_limit": "768m"
+    },
+    "aftersale": {
+      "entrypoint": [
+        "java",
+        "-Xms16m",
+        "-Xmx48m",
+        "-Xss512k",
+        "-XX:+UseSerialGC",
+        "-XX:TieredStopAtLevel=1",
+        "-XX:MaxMetaspaceSize=128m",
+        "-XX:ReservedCodeCacheSize=24m",
+        "-XX:MaxDirectMemorySize=8m",
+        "-XX:ActiveProcessorCount=1",
+        "-jar",
+        "/app/app.jar"
+      ],
+      "command": [
+        "--server.address=0.0.0.0",
+        "--management.server.address=0.0.0.0",
+        "--management.server.port=18085",
+        "--spring.datasource.hikari.maximum-pool-size=2",
+        "--spring.datasource.hikari.minimum-idle=1",
+        "--server.tomcat.threads.max=8",
+        "--server.tomcat.threads.min-spare=2"
+      ],
+      "mem_limit": "384m",
+      "memswap_limit": "768m"
+    },
+    "payment-simulator": {
+      "entrypoint": [
+        "java",
+        "-Xms16m",
+        "-Xmx48m",
+        "-Xss512k",
+        "-XX:+UseSerialGC",
+        "-XX:TieredStopAtLevel=1",
+        "-XX:MaxMetaspaceSize=128m",
+        "-XX:ReservedCodeCacheSize=24m",
+        "-XX:MaxDirectMemorySize=8m",
+        "-XX:ActiveProcessorCount=1",
+        "-jar",
+        "/app/app.jar"
+      ],
+      "command": [
+        "--server.address=0.0.0.0",
+        "--management.server.address=0.0.0.0",
+        "--management.server.port=18086",
+        "--spring.datasource.hikari.maximum-pool-size=2",
+        "--spring.datasource.hikari.minimum-idle=1",
+        "--server.tomcat.threads.max=8",
+        "--server.tomcat.threads.min-spare=2"
+      ],
+      "mem_limit": "384m",
+      "memswap_limit": "768m"
+    },
+    "gateway": {
+      "entrypoint": [
+        "java",
+        "-Xms16m",
+        "-Xmx64m",
+        "-Xss512k",
+        "-XX:+UseSerialGC",
+        "-XX:TieredStopAtLevel=1",
+        "-XX:MaxMetaspaceSize=128m",
+        "-XX:ReservedCodeCacheSize=24m",
+        "-XX:MaxDirectMemorySize=16m",
+        "-XX:ActiveProcessorCount=1",
+        "-jar",
+        "/app/app.jar"
+      ],
+      "command": [
+        "--server.address=0.0.0.0",
+        "--management.server.address=0.0.0.0",
+        "--management.server.port=18080"
+      ],
+      "mem_limit": "384m",
+      "memswap_limit": "768m"
+    },
+    "mysql": {
+      "command": [
+        "--default-time-zone=+00:00",
+        "--transaction-isolation=READ-COMMITTED",
+        "--character-set-server=utf8mb4",
+        "--collation-server=utf8mb4_0900_ai_ci",
+        "--innodb-buffer-pool-size=67108864",
+        "--innodb-log-buffer-size=8388608",
+        "--max-connections=80",
+        "--performance-schema=OFF"
+      ],
+      "mem_limit": "512m",
+      "memswap_limit": "768m"
+    },
+    "rabbitmq": {
+      "environment": {
+        "RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS": "+S 2:2 +SDcpu 1 +SDio 1",
+        "RABBITMQ_CTL_ERL_ARGS": "+S 1:1 +SDcpu 1 +SDio 1"
+      },
+      "mem_limit": "512m",
+      "memswap_limit": "768m"
+    }
+  }
+}

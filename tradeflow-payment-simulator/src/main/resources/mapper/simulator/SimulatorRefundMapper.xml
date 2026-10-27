@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.paymentsimulator.infrastructure.SimulatorRefundMapper">
+  <select id="find" resultType="map">
+    SELECT *
+    FROM channel_refund
+    WHERE refund_no=#{refundNo}
+  </select>
+
+  <select id="lock" resultType="map">
+    SELECT *
+    FROM channel_refund
+    WHERE refund_no=#{refundNo} FOR UPDATE
+  </select>
+
+  <update id="reserve">
+    UPDATE channel_transaction
+    SET reserved_refund_cents=reserved_refund_cents+#{amountCents}
+    WHERE payment_no=#{paymentNo}
+      AND status='SUCCEEDED'
+      AND #{amountCents}&gt;0
+      AND #{amountCents}&lt;=amount_cents-reserved_refund_cents-succeeded_refund_cents
+  </update>
+
+  <update id="settle">
+    UPDATE channel_transaction
+    SET reserved_refund_cents=reserved_refund_cents-#{amountCents},succeeded_refund_cents=succeeded_refund_cents+#{succeededRefundCents}
+    WHERE payment_no=#{paymentNo}
+      AND reserved_refund_cents&gt;=#{amountCents}
+  </update>
+
+  <insert id="insert">
+    INSERT INTO channel_refund(refund_no,payment_no,order_no,source_no,amount_cents,currency,status,channel_refund_no,succeeded_at)
+    VALUES(#{channelCommand.refundNo},#{channelCommand.paymentNo},#{channelCommand.orderNo},#{channelCommand.sourceNo},#{channelCommand.amountCents},#{channelCommand.currency},#{status},#{channelRefundNo},IF(#{status}='SUCCEEDED',UTC_TIMESTAMP(3),NULL))
+  </insert>
+
+  <update id="succeed">
+    UPDATE channel_refund
+    SET status='SUCCEEDED',channel_version=channel_version+1,succeeded_at=UTC_TIMESTAMP(3),updated_at=UTC_TIMESTAMP(3)
+    WHERE refund_no=#{refundNo}
+      AND status='PROCESSING'
+  </update>
+
+  <insert id="defaultScenario">
+    INSERT INTO refund_fault_scenario(refund_no,mode,actor_id,reason)
+    VALUES(#{refundNo},'SUCCESS','SYSTEM','首次退款默认场景')
+    ON DUPLICATE KEY UPDATE refund_no=refund_no
+  </insert>
+
+  <select id="scenarioLock" resultType="string">
+    SELECT mode
+    FROM refund_fault_scenario
+    WHERE refund_no=#{refundNo} FOR UPDATE
+  </select>
+
+  <insert id="configure">
+    INSERT INTO refund_fault_scenario(refund_no,mode,actor_id,reason)
+    VALUES(#{refundNo},#{mode},#{actorId},#{reason})
+  </insert>
+
+  <insert id="process">
+    INSERT INTO refund_process_task(task_no,payment_no,next_retry_at)
+    VALUES(#{taskNo},#{paymentNo},UTC_TIMESTAMP(3)+INTERVAL 5 SECOND)
+  </insert>
+
+  <insert id="callback">
+    INSERT INTO refund_callback_task(task_no,payment_no,payload,deliveries_required)
+    VALUES(#{taskNo},#{paymentNo},#{payload},#{deliveriesRequired})
+  </insert>
+</mapper>

@@ -1,0 +1,63 @@
+name: tradeflow-remote
+
+# 只新增本项目的 Nacos/Sentinel；不接管服务器上其他项目的数据库和消息队列。
+services:
+  nacos:
+    image: nacos/nacos-server:v3.0.3@sha256:a223937902d4292e49ce6bcca8c9d47d29d508075b7f7c6ba98e1a34ff9c3f3b
+    container_name: tradeflow-nacos
+    restart: unless-stopped
+    mem_limit: 512m
+    memswap_limit: 768m
+    cpus: 1.0
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: 'true'
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN:?required}
+      NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY:?required}
+      NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE:?required}
+      JVM_XMS: 96m
+      JVM_XMX: 192m
+      JVM_XMN: 32m
+      JVM_MS: 64m
+      JVM_MMS: 128m
+      JAVA_TOOL_OPTIONS: -XX:ReservedCodeCacheSize=48m -XX:MaxDirectMemorySize=32m -XX:ActiveProcessorCount=2
+    ports:
+      - 127.0.0.1:18848:8848
+      - 127.0.0.1:19848:9848
+      - 127.0.0.1:18880:8080
+    volumes:
+      - nacos-data:/home/nacos/data
+      - nacos-logs:/home/nacos/logs
+
+  sentinel:
+    image: eclipse-temurin:21-jre-jammy
+    container_name: tradeflow-sentinel
+    restart: unless-stopped
+    mem_limit: 224m
+    memswap_limit: 384m
+    cpus: 0.5
+    # 控制台需经反向 SSH 隧道访问本机 Sentinel 客户端；仅绑定宿主机回环地址。
+    network_mode: host
+    environment:
+      AUTH_USERNAME: ${SENTINEL_USERNAME:?required}
+      AUTH_PASSWORD: ${SENTINEL_PASSWORD:?required}
+    entrypoint: [java]
+    command:
+      - -Xms32m
+      - -Xmx64m
+      - -XX:MaxMetaspaceSize=80m
+      - -XX:ReservedCodeCacheSize=32m
+      - -XX:MaxDirectMemorySize=16m
+      - -XX:ActiveProcessorCount=1
+      - -XX:+UseSerialGC
+      - -Dfile.encoding=UTF-8
+      - -jar
+      - /opt/sentinel-dashboard.jar
+      - --server.address=127.0.0.1
+      - --server.port=18871
+    volumes:
+      - ./artifacts/sentinel-dashboard-1.8.9.jar:/opt/sentinel-dashboard.jar:ro
+
+volumes:
+  nacos-data:
+  nacos-logs:

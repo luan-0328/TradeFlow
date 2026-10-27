@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.user.infrastructure.AccountMapper">
+  <insert id="actorAudit">
+    INSERT INTO audit_log(actor_type,actor_id,action,business_no,request_id,trace_id,reason,change_summary)
+    VALUES(#{actorType},#{actorId},#{action},#{businessNo},#{requestId},#{traceId},#{reason},#{changeSummary})
+  </insert>
+  <!-- 保留原SQL的事务前提、条件更新、锁顺序及租约围栏；业务说明见Mapper方法中文注释。 -->
+  <resultMap id="accountRowResult" type="com.tradeflow.user.domain.AccountRow">
+    <constructor>
+      <arg column="id" name="id" javaType="java.lang.String"/>
+      <arg column="username" name="username" javaType="java.lang.String"/>
+      <arg column="password_hash" name="passwordHash" javaType="java.lang.String"/>
+      <arg column="display_name" name="displayName" javaType="java.lang.String"/>
+      <arg column="status" name="status" javaType="java.lang.String"/>
+      <arg column="token_version" name="tokenVersion" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <select id="byUsername" resultMap="accountRowResult">
+    SELECT CAST(id AS CHAR) id,username,password_hash,display_name,status,token_version
+    FROM user_account
+    WHERE username=#{username}
+  </select>
+
+  <select id="byId" resultMap="accountRowResult">
+    SELECT CAST(id AS CHAR) id,username,password_hash,display_name,status,token_version
+    FROM user_account
+    WHERE id=#{id}
+  </select>
+
+  <select id="lock" resultMap="accountRowResult">
+    SELECT CAST(id AS CHAR) id,username,password_hash,display_name,status,token_version
+    FROM user_account
+    WHERE id=#{id} FOR UPDATE
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+    INSERT INTO user_account(username,password_hash,display_name)
+    VALUES(#{username},#{passwordHash},#{displayName})
+  </insert>
+
+  <insert id="insertVerifiedEmail" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+    INSERT INTO user_account(username,password_hash,display_name,email_verified_at)
+    VALUES(#{username},#{passwordHash},#{displayName},UTC_TIMESTAMP(3))
+  </insert>
+
+  <select id="roles" resultType="string">
+    SELECT r.role_code
+    FROM user_role ur
+    JOIN role r ON r.id=ur.role_id
+    WHERE ur.user_id=#{userId} AND ur.status='ACTIVE'
+    ORDER BY r.role_code
+  </select>
+
+  <select id="merchants" resultType="string">
+    SELECT mm.merchant_id
+    FROM merchant_member mm JOIN merchant m ON m.merchant_id=mm.merchant_id
+    WHERE mm.user_id=#{userId} AND mm.status='ACTIVE'
+    ORDER BY mm.merchant_id
+  </select>
+  <select id="merchantExists" resultType="_long">SELECT COUNT(*) FROM merchant WHERE merchant_id=#{id}</select>
+  <update id="password">
+    UPDATE user_account SET password_hash=#{hash},token_version=token_version+1,version=version+1
+    WHERE id=#{id} AND password_hash=#{originalHash} AND token_version=#{tokenVersion} AND status='ACTIVE'
+  </update>
+
+  <select id="lockAdminRole" resultType="_long">
+    SELECT id
+    FROM authorization_guard
+    WHERE id=1 FOR UPDATE
+  </select>
+
+  <update id="disableRoles">
+    UPDATE user_role
+    SET status='DISABLED',version=version+1
+    WHERE user_id=#{userId} AND status='ACTIVE'
+  </update>
+
+  <insert id="grantRole">
+    INSERT INTO user_role(user_id,role_id) SELECT #{userId},id
+    FROM role
+    WHERE role_code=#{roleCode}
+    ON DUPLICATE KEY UPDATE status='ACTIVE',version=user_role.version+1
+  </insert>
+
+  <select id="activeAdmins" resultType="_long">
+    SELECT COUNT(*)
+    FROM user_account u
+    JOIN user_role ur ON ur.user_id=u.id
+    JOIN role r ON r.id=ur.role_id
+    WHERE u.status='ACTIVE' AND ur.status='ACTIVE' AND r.role_code='PLATFORM_ADMIN'
+  </select>
+
+  <update id="revoke">
+    UPDATE user_account
+    SET status=#{status},token_version=token_version+1,version=version+1
+    WHERE id=#{id}
+  </update>
+
+  <insert id="member">
+    INSERT INTO merchant_member(user_id,merchant_id,status)
+    VALUES(#{userId},#{merchantId},#{status})
+    ON DUPLICATE KEY UPDATE status=#{status},version=merchant_member.version+1
+  </insert>
+
+  <!-- 所有成员/全局账号状态修改先持有authorization_guard，计数与授权写串行，避免两个管理员同时移除。 -->
+  <select id="merchantRoles" resultType="map">
+    SELECT mm.merchant_id merchantId,mm.role FROM merchant_member mm
+    JOIN merchant m ON m.merchant_id=mm.merchant_id
+    WHERE mm.user_id=#{userId} AND mm.status='ACTIVE' ORDER BY mm.merchant_id
+  </select>
+  <select id="merchantMember" resultType="map">
+    SELECT role,status FROM merchant_member WHERE user_id=#{userId} AND merchant_id=#{merchantId}
+  </select>
+  <select id="activeMerchantAdmins" resultType="_long">
+    SELECT COUNT(*) FROM merchant_member mm JOIN user_account u ON u.id=mm.user_id
+    WHERE mm.merchant_id=#{merchantId} AND mm.status='ACTIVE' AND mm.role='ADMIN' AND u.status='ACTIVE'
+  </select>
+  <insert id="memberWithRole">
+    INSERT INTO merchant_member(user_id,merchant_id,status,role) VALUES(#{userId},#{merchantId},#{status},#{role})
+    ON DUPLICATE KEY UPDATE status=#{status},role=#{role},version=merchant_member.version+1
+  </insert>
+  <update id="loggedIn">
+    UPDATE user_account
+    SET last_login_at=UTC_TIMESTAMP(3),version=version+1
+    WHERE id=#{id}
+  </update>
+
+  <select id="list" resultMap="accountRowResult">
+    SELECT CAST(id AS CHAR) id,username,password_hash,display_name,status,token_version
+    FROM user_account
+    ORDER BY id
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="_long">
+    SELECT COUNT(*)
+    FROM user_account
+  </select>
+
+  <insert id="audit">
+    INSERT INTO audit_log(actor_type,actor_id,action,business_no,request_id,trace_id,reason,change_summary)
+    VALUES('PLATFORM',#{actorId},#{action},#{businessNo},#{requestId},#{traceId},#{reason},#{changeSummary})
+  </insert>
+</mapper>

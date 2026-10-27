@@ -1,0 +1,24 @@
+# 前端构建上下文只允许源文件、锁和Nginx配置；.local/JAR/其他后台代码不进入上下文。
+**
+!package.json
+!package-lock.json
+!web-user/
+!web-user/**
+!web-admin/
+!web-admin/**
+!web-shared/
+!web-shared/**
+!deploy/
+!deploy/Dockerfile.web
+!deploy/Dockerfile.web.dockerignore
+!deploy/web/
+!deploy/web/nginx.conf
+**/node_modules
+**/dist
+**/.local
+**/.git
+**/*.pem
+**/*.key
+**/.env
+**/.env.*
+**/*.log

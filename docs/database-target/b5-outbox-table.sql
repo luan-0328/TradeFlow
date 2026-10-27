@@ -1,0 +1,33 @@
+-- B5 订单、售后库新迁移模板；与支付outbox结构一致并包含wire_payload。
+CREATE TABLE `outbox_event` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '内部自增主键，不能替代业务授权校验',
+  `event_id` VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT '稳定事件编号',
+  `aggregate_type` VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT '聚合类型',
+  `aggregate_id` VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT '聚合业务编号',
+  `aggregate_version` BIGINT NOT NULL DEFAULT 0 COMMENT '聚合版本',
+  `event_type` VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT '事件类型',
+  `event_version` INT NOT NULL DEFAULT 1 COMMENT '事件契约版本',
+  `correlation_id` VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT '业务关联编号',
+  `causation_id` VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT '触发命令或事件编号',
+  `trace_id` VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT '追踪编号',
+  `payload` JSON NOT NULL COMMENT '事件业务载荷',
+  `wire_payload` LONGTEXT NULL COMMENT '首次领取冻结的完整事件信封UTF8正文，后续发布始终保持相同字节',
+  `status` ENUM('READY','RUNNING','SENT','MANUAL_REVIEW') NOT NULL DEFAULT 'READY' COMMENT '发布状态',
+  `attempt_count` INT NOT NULL DEFAULT 0 COMMENT '发布尝试次数',
+  `next_retry_at` DATETIME(3) NOT NULL COMMENT '下次发布时间',
+  `lease_owner` VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL COMMENT '领取者',
+  `lease_until` DATETIME(3) NULL COMMENT '租约截止时间',
+  `claim_version` BIGINT NOT NULL DEFAULT 0 COMMENT '领取版本',
+  `published_at` DATETIME(3) NULL COMMENT '确认发布完成时间',
+  `last_error` VARCHAR(1000) NULL COMMENT '路由或确认错误',
+  `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间，统一存储 UTC',
+  `updated_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '最后更新时间，统一存储 UTC',
+  `version` BIGINT NOT NULL DEFAULT 0 COMMENT '乐观版本号，每次受控修改递增',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_outbox_event_1` (`event_id`),
+  KEY `ix_outbox_event_1` (`status`,`next_retry_at`,`id`),
+  KEY `ix_outbox_event_2` (`lease_until`,`id`),
+  CONSTRAINT `ck_outbox_event_1` CHECK (event_version > 0),
+  CONSTRAINT `ck_outbox_event_2` CHECK (aggregate_version >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='与本地业务同事务写入的待发布事件';
+

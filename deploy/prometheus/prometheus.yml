@@ -1,0 +1,20 @@
+# 仅回环管理端口；独立只读Bearer文件，不复用平台JWT。
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+rule_files:
+  - __RULES_FILE__
+scrape_configs:
+  - job_name: tradeflow-applications
+    metrics_path: /actuator/prometheus
+    authorization:
+      type: Bearer
+      credentials_file: __MONITOR_TOKEN_FILE__
+    static_configs:
+      - targets: ['127.0.0.1:18080', '127.0.0.1:18081', '127.0.0.1:18082', '127.0.0.1:18083', '127.0.0.1:18084', '127.0.0.1:18085', '127.0.0.1:18086']
+  - job_name: tradeflow-rabbitmq
+    authorization:
+      type: Bearer
+      credentials_file: __MONITOR_TOKEN_FILE__
+    static_configs:
+      - targets: ['127.0.0.1:15698']

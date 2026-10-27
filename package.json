@@ -1,0 +1,7 @@
+{
+  "name": "tradeflow-web", "private": true, "version": "0.1.0",
+  "workspaces": ["web-user", "web-admin", "web-shared"],
+  "scripts": {"build": "npm run build -w web-user && npm run build -w web-admin", "dev:user": "npm run dev -w web-user", "dev:admin": "npm run dev -w web-admin"},
+  "devDependencies": {"@vitejs/plugin-vue": "6.0.10", "typescript": "5.9.3", "vite": "8.3.5", "vue-tsc": "3.3.13"},
+  "engines": {"node": ">=22.12.0"}
+}

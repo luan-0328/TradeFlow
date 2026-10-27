@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.product.infrastructure.ProductImageMapper">
+    <resultMap id="ImageRowMap" type="com.tradeflow.product.infrastructure.ProductImageMapper$ImageRow">
+        <constructor>
+            <arg column="image_no" javaType="java.lang.String"/>
+            <arg column="product_id" javaType="java.lang.String"/>
+            <arg column="merchant_id" javaType="java.lang.String"/>
+            <arg column="content_type" javaType="java.lang.String"/>
+            <arg column="size_bytes" javaType="_long"/>
+        </constructor>
+    </resultMap>
+    <select id="count" resultType="int">SELECT COUNT(*) FROM product_image WHERE product_id=#{productId} AND deleted=0</select>
+    <insert id="insert">
+        INSERT INTO product_image(image_no,product_id,merchant_id,content_type,size_bytes,content)
+        VALUES(#{imageNo},#{productId},#{merchantId},'image/png',OCTET_LENGTH(#{content}),#{content})
+    </insert>
+    <!-- 元数据和字节都联查商品，并复核双重归属，商家ID不能绕过公开上架条件。 -->
+    <select id="list" resultMap="ImageRowMap">
+        SELECT i.image_no,CAST(i.product_id AS CHAR) product_id,i.merchant_id,i.content_type,i.size_bytes
+        FROM product_image i JOIN product p ON p.id=i.product_id AND p.merchant_id=i.merchant_id
+        WHERE i.product_id=#{productId} AND i.deleted=0
+        <choose><when test="merchantId != null">AND p.merchant_id=#{merchantId}</when><otherwise>AND p.status='ON_SALE'</otherwise></choose>
+        ORDER BY i.id
+    </select>
+    <select id="content" resultType="map">
+        SELECT i.content FROM product_image i JOIN product p ON p.id=i.product_id AND p.merchant_id=i.merchant_id
+        WHERE i.image_no=#{imageNo} AND i.deleted=0 AND p.status='ON_SALE'
+    </select>
+    <select id="merchantContent" resultType="map">
+        SELECT i.content FROM product_image i JOIN product p ON p.id=i.product_id AND p.merchant_id=i.merchant_id
+        WHERE i.image_no=#{imageNo} AND i.merchant_id=#{merchantId} AND i.deleted=0
+    </select>
+    <update id="remove">
+        UPDATE product_image SET deleted=1 WHERE product_id=#{productId} AND merchant_id=#{merchantId} AND image_no=#{imageNo} AND deleted=0
+    </update>
+</mapper>

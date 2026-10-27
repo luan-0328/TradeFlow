@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.product.infrastructure.InventoryConditionMapper">
+    <resultMap id="ResultMap" type="com.tradeflow.product.application.InventoryConditionService$Result">
+        <constructor>
+            <arg column="operation_no" javaType="java.lang.String"/>
+            <arg column="sku_id" javaType="java.lang.String"/>
+            <arg column="from_condition" javaType="java.lang.String"/>
+            <arg column="to_condition" javaType="java.lang.String"/>
+            <arg column="quantity" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
+    <insert id="ensure">
+        INSERT INTO inventory_condition(warehouse_id,sku_id,stock_condition,quantity) VALUES(#{warehouseId},#{skuId},#{stockCondition},0) ON DUPLICATE KEY UPDATE quantity=quantity
+    </insert>
+
+    <update id="adjust">
+        UPDATE inventory_condition SET quantity=quantity+#{delta},version=version+1 WHERE warehouse_id=#{warehouseId} AND sku_id=#{skuId} AND stock_condition=#{stockCondition} AND quantity+#{delta} BETWEEN 0 AND 1000000000
+    </update>
+
+    <select id="list" resultType="java.util.LinkedHashMap">
+        SELECT c.warehouse_id warehouseId,CAST(c.sku_id AS CHAR) skuId,c.stock_condition stockCondition,c.quantity,c.version FROM inventory_condition c JOIN sku s ON s.id=c.sku_id JOIN product p ON p.id=s.product_id WHERE p.merchant_id=#{merchantId} ORDER BY c.sku_id,c.stock_condition LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*) FROM inventory_condition c JOIN sku s ON s.id=c.sku_id JOIN product p ON p.id=s.product_id WHERE p.merchant_id=#{merchantId}
+    </select>
+
+    <select id="lookup" resultMap="ResultMap">
+        SELECT o.operation_no,CAST(o.sku_id AS CHAR) sku_id,o.from_condition,o.to_condition,o.quantity FROM idempotency_request r JOIN inventory_condition_operation o ON o.operation_no=r.business_no WHERE r.actor_type='USER' AND r.actor_id=#{actorId} AND r.operation='CHANGE_INVENTORY_CONDITION' AND r.idempotency_key=#{idempotencyKey} AND r.state='SUCCEEDED' AND o.sku_id=#{skuId}
+    </select>
+
+    <insert id="operation">
+        INSERT INTO inventory_condition_operation(operation_no,warehouse_id,sku_id,from_condition,to_condition,quantity,actor_id,reason) VALUES(#{operationNo},'warehouse_main',#{skuId},#{fromCondition},#{toCondition},#{quantity},#{actorId},#{reason})
+    </insert>
+</mapper>

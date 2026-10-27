@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.order.infrastructure.OrderMapper">
+  <!-- 保留原SQL的事务前提、条件更新、锁顺序及租约围栏；业务说明见Mapper方法中文注释。 -->
+  <resultMap id="requestRowResult" type="com.tradeflow.order.domain.OrderRows$RequestRow">
+    <constructor>
+      <arg column="request_hash" name="requestHash" javaType="java.lang.String"/>
+      <arg column="business_no" name="businessNo" javaType="java.lang.String"/>
+      <arg column="state" name="state" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="shippingAddressResult" type="com.tradeflow.order.api.OrderModels$ShippingAddress">
+    <constructor>
+      <arg column="receiver_name" name="receiverName" javaType="java.lang.String"/>
+      <arg column="receiver_phone" name="receiverPhone" javaType="java.lang.String"/>
+      <arg column="region" name="region" javaType="java.lang.String"/>
+      <arg column="detail_address" name="detailAddress" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="intentResult" type="com.tradeflow.order.domain.OrderRows$Intent">
+    <constructor>
+      <arg column="order_no" name="orderNo" javaType="java.lang.String"/>
+      <arg column="user_id" name="userId" javaType="java.lang.String"/>
+      <arg column="payment_no" name="paymentNo" javaType="java.lang.String"/>
+      <arg column="reservation_no" name="reservationNo" javaType="java.lang.String"/>
+      <arg column="request_hash" name="requestHash" javaType="java.lang.String"/>
+      <arg column="request_payload" name="requestPayload" javaType="java.lang.String"/>
+      <arg column="state" name="state" javaType="java.lang.String"/>
+      <arg column="result_code" name="resultCode" javaType="java.lang.String"/>
+      <arg column="created_at" name="createdAt" javaType="java.time.Instant"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="headerResult" type="com.tradeflow.order.domain.OrderRows$Header">
+    <constructor>
+      <arg column="order_no" name="orderNo" javaType="java.lang.String"/>
+      <arg column="user_id" name="userId" javaType="java.lang.String"/>
+      <arg column="merchant_id" name="merchantId" javaType="java.lang.String"/>
+      <arg column="payment_no" name="paymentNo" javaType="java.lang.String"/>
+      <arg column="reservation_no" name="reservationNo" javaType="java.lang.String"/>
+      <arg column="quote_no" name="quoteNo" javaType="java.lang.String"/>
+      <arg column="total_amount_cents" name="totalAmountCents" javaType="_long"/>
+      <arg column="currency" name="currency" javaType="java.lang.String"/>
+      <arg column="status" name="status" javaType="java.lang.String"/>
+      <arg column="stock_decision" name="stockDecision" javaType="java.lang.String"/>
+      <arg column="stock_sync_status" name="stockSyncStatus" javaType="java.lang.String"/>
+      <arg column="fulfillment_lock" name="fulfillmentLock" javaType="java.lang.String"/>
+      <arg column="pay_deadline" name="payDeadline" javaType="java.time.Instant"/>
+      <arg column="created_at" name="createdAt" javaType="java.time.Instant"/>
+      <arg column="close_phase" name="closePhase" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="itemResult" type="com.tradeflow.order.domain.OrderRows$Item">
+    <constructor>
+      <arg column="id" name="id" javaType="java.lang.String"/>
+      <arg column="sku_id" name="skuId" javaType="java.lang.String"/>
+      <arg column="product_name_snapshot" name="productNameSnapshot" javaType="java.lang.String"/>
+      <arg column="spec_snapshot" name="specSnapshot" javaType="java.lang.String"/>
+      <arg column="unit_price_cents" name="unitPriceCents" javaType="_long"/>
+      <arg column="quantity" name="quantity" javaType="_int"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="unitViewResult" type="com.tradeflow.order.api.OrderModels$UnitView">
+    <constructor>
+      <arg column="unit_no" name="unitNo" javaType="_int"/>
+      <arg column="paid_amount_cents" name="paidAmountCents" javaType="_long"/>
+      <arg column="reserved_refund_cents" name="reservedRefundCents" javaType="_long"/>
+      <arg column="succeeded_refund_cents" name="succeededRefundCents" javaType="_long"/>
+      <arg column="remaining_refund_cents" name="remainingRefundCents" javaType="_long"/>
+      <arg column="return_state" name="returnState" javaType="java.lang.String"/>
+      <arg column="has_active_aftersale" name="hasActiveAftersale" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+
+  <insert id="claimRequest">
+    INSERT INTO idempotency_request(actor_type,actor_id,operation,idempotency_key,request_hash,business_no)
+    VALUES('USER',#{userId},'PLACE_ORDER',#{idempotencyKey},#{requestHash},#{orderNo})
+    ON DUPLICATE KEY UPDATE id=id
+  </insert>
+
+  <select id="lockRequest" resultMap="requestRowResult">
+    SELECT request_hash,business_no,state
+    FROM idempotency_request
+    WHERE actor_type='USER' AND actor_id=#{userId} AND operation='PLACE_ORDER' AND idempotency_key=#{idempotencyKey} FOR UPDATE
+  </select>
+
+  <select id="requestByKey" resultMap="requestRowResult">
+    SELECT request_hash,business_no,state
+    FROM idempotency_request
+    WHERE actor_type='USER' AND actor_id=#{userId} AND operation='PLACE_ORDER' AND idempotency_key=#{idempotencyKey}
+  </select>
+
+  <insert id="sealedIntent">
+    INSERT INTO order_creation_intent(order_no,user_id,payment_no,reservation_no,request_hash,request_payload,state,result_code)
+    VALUES(#{orderNo},#{userId},#{paymentNo},#{reservationNo},#{requestHash},NULL,'CANCELLED','REQUEST_SEALED')
+  </insert>
+
+  <select id="shippingAddress" resultMap="shippingAddressResult">
+    SELECT receiver_name,receiver_phone,region,detail_address
+    FROM order_address
+    WHERE order_no=#{orderNo}
+  </select>
+
+  <update id="requestResult">
+    UPDATE idempotency_request
+    SET state=#{state},result_code=#{resultCode},version=version+1
+    WHERE business_no=#{orderNo} AND operation='PLACE_ORDER'
+  </update>
+
+  <insert id="intent">
+    INSERT INTO order_creation_intent(order_no,user_id,payment_no,reservation_no,request_hash,request_payload)
+    VALUES(#{orderNo},#{userId},#{paymentNo},#{reservationNo},#{requestHash},#{requestPayload})
+  </insert>
+
+  <select id="intentByNo" resultMap="intentResult">
+    SELECT order_no,user_id,payment_no,reservation_no,request_hash,request_payload,state,result_code,created_at
+    FROM order_creation_intent
+    WHERE order_no=#{orderNo}
+  </select>
+
+  <select id="lockIntent" resultMap="intentResult">
+    SELECT order_no,user_id,payment_no,reservation_no,request_hash,request_payload,state,result_code,created_at
+    FROM order_creation_intent
+    WHERE order_no=#{orderNo} FOR UPDATE
+  </select>
+
+  <update id="intentState">
+    UPDATE order_creation_intent
+    SET state=#{state},result_code=#{resultCode},request_payload=NULL,version=version+1
+    WHERE order_no=#{orderNo}
+  </update>
+
+  <insert id="createOrder">
+    INSERT INTO orders(order_no,user_id,merchant_id,payment_no,reservation_no,quote_no,total_amount_cents,pay_deadline)
+    VALUES(#{orderNo},#{userId},#{merchantId},#{paymentNo},#{reservationNo},#{quoteNo},#{totalAmountCents},#{payDeadline})
+  </insert>
+
+  <insert id="item" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+    INSERT INTO order_item(order_no,product_id,sku_id,product_name_snapshot,spec_snapshot,unit_price_cents,quantity,line_amount_cents)
+    VALUES(#{orderNo},#{productId},#{skuId},#{productNameSnapshot},#{specSnapshot},#{unitPriceCents},#{quantity},#{lineAmountCents})
+  </insert>
+
+  <insert id="units">
+    INSERT INTO order_item_unit(order_item_id,unit_no,paid_amount_cents)
+    VALUES 
+    <foreach collection='units' item='unit' separator=','>(#{orderItemId},#{unit},#{paidAmountCents})</foreach>
+  </insert>
+
+  <insert id="address">
+    INSERT INTO order_address(order_no,receiver_name,receiver_phone,region,detail_address)
+    VALUES(#{orderNo},#{receiverName},#{receiverPhone},#{region},#{detailAddress})
+  </insert>
+
+  <select id="order" resultMap="headerResult">
+    SELECT order_no,user_id,merchant_id,payment_no,reservation_no,quote_no,total_amount_cents,currency,status,stock_decision,stock_sync_status,fulfillment_lock,pay_deadline,created_at,close_phase
+    FROM orders
+    WHERE order_no=#{orderNo}
+  </select>
+
+  <select id="lockOrder" resultMap="headerResult">
+    SELECT order_no,user_id,merchant_id,payment_no,reservation_no,quote_no,total_amount_cents,currency,status,stock_decision,stock_sync_status,fulfillment_lock,pay_deadline,created_at,close_phase
+    FROM orders
+    WHERE order_no=#{orderNo} FOR UPDATE
+  </select>
+
+  <update id="pending">
+    UPDATE orders
+    SET status='PENDING_PAYMENT',version=version+1
+    WHERE order_no=#{orderNo} AND status='CREATING' AND stock_decision='UNDECIDED' AND pay_deadline&gt;UTC_TIMESTAMP(3)
+  </update>
+
+  <update id="closing">
+    UPDATE orders
+    SET status='CLOSING',stock_decision='RELEASE',close_reason=#{reason},version=version+1
+    WHERE order_no=#{orderNo} AND status='CREATING' AND stock_decision='UNDECIDED'
+  </update>
+
+  <update id="closed">
+    UPDATE orders
+    SET status='CLOSED',stock_sync_status='RELEASED',closed_at=UTC_TIMESTAMP(3),version=version+1
+    WHERE order_no=#{orderNo} AND status='CLOSING' AND stock_decision='RELEASE'
+  </update>
+
+  <select id="items" resultMap="itemResult">
+    SELECT CAST(id AS CHAR) id,CAST(sku_id AS CHAR) sku_id,product_name_snapshot,spec_snapshot,unit_price_cents,quantity
+    FROM order_item
+    WHERE order_no=#{orderNo}
+    ORDER BY id
+  </select>
+
+  <select id="unitsByItem" resultMap="unitViewResult">
+    SELECT unit_no,paid_amount_cents,reserved_refund_cents,succeeded_refund_cents,(paid_amount_cents-reserved_refund_cents-succeeded_refund_cents) remaining_refund_cents,return_state,(active_aftersale_no IS NOT NULL) has_active_aftersale
+    FROM order_item_unit
+    WHERE order_item_id=#{orderItemId}
+    ORDER BY unit_no
+  </select>
+
+  <select id="list" resultMap="headerResult">
+    SELECT order_no,user_id,merchant_id,payment_no,reservation_no,quote_no,total_amount_cents,currency,status,stock_decision,stock_sync_status,fulfillment_lock,pay_deadline,created_at,close_phase
+    FROM orders
+    WHERE user_id=#{userId}
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="_long">
+    SELECT COUNT(*)
+    FROM orders
+    WHERE user_id=#{userId}
+  </select>
+
+  <insert id="log">
+    INSERT INTO order_status_log(order_no,from_status,to_status,operation,actor_id,request_id,reason)
+    VALUES(#{orderNo},#{fromStatus},#{toStatus},#{operation},#{actorId},#{requestId},#{reason})
+  </insert>
+
+  <insert id="task">
+    INSERT INTO process_task(task_no,task_type,business_no,step,payload,next_retry_at)
+    VALUES(#{taskNo},'CREATE_ORDER',#{businessNo},'QUOTE_STOCK','{}',UTC_TIMESTAMP(3))
+  </insert>
+
+  <select id="expiredCreating" resultType="string">
+    SELECT order_no
+    FROM orders
+    WHERE status='CREATING' AND pay_deadline&lt;=UTC_TIMESTAMP(3)
+    ORDER BY pay_deadline,id
+    LIMIT 30
+  </select>
+
+  <select id="expiredPending" resultType="string">
+    SELECT order_no
+    FROM orders
+    WHERE status='PENDING_PAYMENT' AND pay_deadline&lt;=UTC_TIMESTAMP(3)
+    ORDER BY pay_deadline,id
+    LIMIT 30
+  </select>
+
+  <update id="closingPaidWindow">
+    UPDATE orders
+    SET status='CLOSING',stock_decision='RELEASE',close_phase='PAYMENT_REQUIRED',close_reason=#{reason},version=version+1
+    WHERE order_no=#{orderNo} AND status='PENDING_PAYMENT' AND stock_decision='UNDECIDED'
+  </update>
+
+  <update id="paid">
+    UPDATE orders
+    SET status='PAID',stock_decision='COMMIT',paid_at=#{paidAt},version=version+1
+    WHERE order_no=#{orderNo} AND status='PENDING_PAYMENT' AND stock_decision='UNDECIDED'
+  </update>
+
+  <update id="stockConfirmed">
+    UPDATE orders
+    SET stock_sync_status='CONFIRMED',version=version+1
+    WHERE order_no=#{orderNo} AND status='PAID' AND stock_decision='COMMIT' AND stock_sync_status='PENDING'
+  </update>
+
+  <update id="channelClosed">
+    UPDATE orders
+    SET close_phase='CHANNEL_CLOSED',version=version+1
+    WHERE order_no=#{orderNo} AND status='CLOSING' AND close_phase='PAYMENT_REQUIRED'
+  </update>
+
+  <update id="failedPayment">
+    UPDATE orders
+    SET status='CLOSING',stock_decision='RELEASE',close_phase='CHANNEL_CLOSED',close_reason=#{reason},version=version+1
+    WHERE order_no=#{orderNo} AND status='PENDING_PAYMENT' AND stock_decision='UNDECIDED'
+  </update>
+
+  <update id="latePayment">
+    UPDATE orders
+    SET close_phase='LATE_PAYMENT',close_reason='LATE_PAYMENT_REFUND_REQUIRED',version=version+1
+    WHERE order_no=#{orderNo} AND status IN ('CLOSING','CLOSED')
+  </update>
+
+  <select id="paymentFactHash" resultType="string">
+    SELECT payload_hash
+    FROM order_payment_fact
+    WHERE event_id=#{eventId}
+  </select>
+
+  <insert id="paymentFact">
+    INSERT INTO order_payment_fact(event_id,payment_no,order_no,payload_hash,status,channel_version)
+    VALUES(#{eventId},#{paymentNo},#{orderNo},#{payloadHash},#{status},#{channelVersion})
+  </insert>
+
+  <insert id="audit">
+    INSERT INTO audit_log(actor_type,actor_id,action,business_no,request_id,trace_id,reason,change_summary)
+    VALUES(#{actorType},#{actorId},#{action},#{businessNo},#{requestId},#{traceId},#{reason},#{changeSummary})
+  </insert>
+
+  <select id="currentVersion" resultType="_long">
+    SELECT version
+    FROM orders
+    WHERE order_no=#{orderNo}
+  </select>
+</mapper>

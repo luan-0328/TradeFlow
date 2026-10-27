@@ -1,0 +1,664 @@
+# JSON为YAML子集；独立项目，禁止与旧compose.yaml合并。管理端口仅内部可达。
+{
+  "name": "tradeflow-b8",
+  "services": {
+    "mysql": {
+      "image": "mysql:8.0.46",
+      "environment": {
+        "MYSQL_ROOT_PASSWORD_FILE": "/run/secrets/mysql-root",
+        "MYSQL_ROOT_HOST": "%"
+      },
+      "volumes": [
+        "mysql-data:/var/lib/mysql",
+        "../.local/deployment/mysql-root:/run/secrets/mysql-root:ro",
+        "../.local/deployment/bootstrap.sql:/docker-entrypoint-initdb.d/01-bootstrap.sql:ro",
+        "../.local/deployment/mysql-client.cnf:/run/secrets/mysql-client.cnf:ro",
+        "../.local/deployment/deployment-id:/run/tradeflow/deployment-id:ro",
+        "../.local/deployment/ownership.sh:/docker-entrypoint-initdb.d/02-ownership.sh:ro"
+      ],
+      "command": [
+        "--default-time-zone=+00:00",
+        "--transaction-isolation=READ-COMMITTED",
+        "--character-set-server=utf8mb4",
+        "--collation-server=utf8mb4_0900_ai_ci"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "mysql --defaults-extra-file=/run/secrets/mysql-client.cnf -Nse \"SELECT 1\" >/dev/null"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "retries": 30,
+        "start_period": "30s"
+      }
+    },
+    "rabbitmq": {
+      "image": "rabbitmq:4.1.8-management",
+      "hostname": "tradeflow-broker",
+      "env_file": [
+        "../.local/deployment/rabbit.env"
+      ],
+      "volumes": [
+        "rabbit-data:/var/lib/rabbitmq",
+        "../.local/deployment/rabbit-definitions.json:/etc/rabbitmq/definitions.json:ro",
+        "../.local/deployment/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "rabbitmq-diagnostics -q check_running && queues=\"$$(rabbitmqctl -q list_queues -p /tradeflow name)\" && for q in q.order.payment q.order.refund q.order.audit q.aftersale.refund; do printf \"%s\\n\" \"$$queues\" | grep -qx \"$$q\" && printf \"%s\\n\" \"$$queues\" | grep -qx \"$$q.dlq\" || exit 1; done"
+        ],
+        "interval": "15s",
+        "timeout": "15s",
+        "retries": 20
+      }
+    },
+    "migrate-user": {
+      "image": "tradeflow/user:0.1.0-b8",
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile",
+        "args": {
+          "MODULE": "tradeflow-user"
+        }
+      },
+      "env_file": [
+        "../.local/deployment/user-migration.env"
+      ],
+      "entrypoint": [
+        "java",
+        "-Xmx128m",
+        "-Dloader.main=com.tradeflow.user.infrastructure.DatabaseMigration",
+        "-cp",
+        "/app/app.jar",
+        "org.springframework.boot.loader.launch.PropertiesLauncher"
+      ],
+      "depends_on": {
+        "mysql": {
+          "condition": "service_healthy"
+        }
+      },
+      "restart": "no"
+    },
+    "migrate-product": {
+      "image": "tradeflow/product:0.1.0-b8",
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile",
+        "args": {
+          "MODULE": "tradeflow-product"
+        }
+      },
+      "env_file": [
+        "../.local/deployment/product-migration.env"
+      ],
+      "entrypoint": [
+        "java",
+        "-Xmx128m",
+        "-Dloader.main=com.tradeflow.product.infrastructure.DatabaseMigration",
+        "-cp",
+        "/app/app.jar",
+        "org.springframework.boot.loader.launch.PropertiesLauncher"
+      ],
+      "depends_on": {
+        "mysql": {
+          "condition": "service_healthy"
+        }
+      },
+      "restart": "no"
+    },
+    "migrate-order": {
+      "image": "tradeflow/order:0.1.0-b8",
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile",
+        "args": {
+          "MODULE": "tradeflow-order"
+        }
+      },
+      "env_file": [
+        "../.local/deployment/order-migration.env"
+      ],
+      "entrypoint": [
+        "java",
+        "-Xmx128m",
+        "-Dloader.main=com.tradeflow.order.infrastructure.DatabaseMigration",
+        "-cp",
+        "/app/app.jar",
+        "org.springframework.boot.loader.launch.PropertiesLauncher"
+      ],
+      "depends_on": {
+        "mysql": {
+          "condition": "service_healthy"
+        }
+      },
+      "restart": "no"
+    },
+    "migrate-payment": {
+      "image": "tradeflow/payment:0.1.0-b8",
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile",
+        "args": {
+          "MODULE": "tradeflow-payment"
+        }
+      },
+      "env_file": [
+        "../.local/deployment/payment-migration.env"
+      ],
+      "entrypoint": [
+        "java",
+        "-Xmx128m",
+        "-Dloader.main=com.tradeflow.payment.infrastructure.DatabaseMigration",
+        "-cp",
+        "/app/app.jar",
+        "org.springframework.boot.loader.launch.PropertiesLauncher"
+      ],
+      "depends_on": {
+        "mysql": {
+          "condition": "service_healthy"
+        }
+      },
+      "restart": "no"
+    },
+    "migrate-aftersale": {
+      "image": "tradeflow/aftersale:0.1.0-b8",
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile",
+        "args": {
+          "MODULE": "tradeflow-aftersale"
+        }
+      },
+      "env_file": [
+        "../.local/deployment/aftersale-migration.env"
+      ],
+      "entrypoint": [
+        "java",
+        "-Xmx128m",
+        "-Dloader.main=com.tradeflow.aftersale.infrastructure.DatabaseMigration",
+        "-cp",
+        "/app/app.jar",
+        "org.springframework.boot.loader.launch.PropertiesLauncher"
+      ],
+      "depends_on": {
+        "mysql": {
+          "condition": "service_healthy"
+        }
+      },
+      "restart": "no"
+    },
+    "migrate-payment-simulator": {
+      "image": "tradeflow/payment-simulator:0.1.0-b8",
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile",
+        "args": {
+          "MODULE": "tradeflow-payment-simulator"
+        }
+      },
+      "env_file": [
+        "../.local/deployment/payment_simulator-migration.env"
+      ],
+      "entrypoint": [
+        "java",
+        "-Xmx128m",
+        "-Dloader.main=com.tradeflow.paymentsimulator.infrastructure.DatabaseMigration",
+        "-cp",
+        "/app/app.jar",
+        "org.springframework.boot.loader.launch.PropertiesLauncher"
+      ],
+      "depends_on": {
+        "mysql": {
+          "condition": "service_healthy"
+        }
+      },
+      "restart": "no"
+    },
+    "runtime-grants": {
+      "image": "mysql:8.0.46",
+      "volumes": [
+        "../.local/deployment/mysql-client.cnf:/run/secrets/mysql-client.cnf:ro",
+        "../.local/deployment/runtime-grants.sql:/run/secrets/runtime-grants.sql:ro"
+      ],
+      "entrypoint": [
+        "sh",
+        "-ec",
+        "exec mysql --defaults-extra-file=/run/secrets/mysql-client.cnf -hmysql < /run/secrets/runtime-grants.sql"
+      ],
+      "depends_on": {
+        "migrate-user": {
+          "condition": "service_completed_successfully"
+        },
+        "migrate-product": {
+          "condition": "service_completed_successfully"
+        },
+        "migrate-order": {
+          "condition": "service_completed_successfully"
+        },
+        "migrate-payment": {
+          "condition": "service_completed_successfully"
+        },
+        "migrate-aftersale": {
+          "condition": "service_completed_successfully"
+        },
+        "migrate-payment-simulator": {
+          "condition": "service_completed_successfully"
+        }
+      },
+      "restart": "no"
+    },
+    "gateway": {
+      "image": "tradeflow/gateway:0.1.0-b8",
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile",
+        "args": {
+          "MODULE": "tradeflow-gateway"
+        }
+      },
+      "env_file": [
+        "../.local/deployment/gateway.env"
+      ],
+      "command": [
+        "--server.address=0.0.0.0",
+        "--management.server.address=0.0.0.0",
+        "--management.server.port=18080"
+      ],
+      "volumes": [
+        "../.local/deployment/jwt-public.pem:/keys/jwt-public.pem:ro"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "curl --fail --silent http://127.0.0.1:18080/actuator/health/readiness >/dev/null"
+        ],
+        "interval": "15s",
+        "timeout": "5s",
+        "retries": 20,
+        "start_period": "60s"
+      },
+      "depends_on": {
+        "runtime-grants": {
+          "condition": "service_completed_successfully"
+        },
+        "rabbitmq": {
+          "condition": "service_healthy"
+        },
+        "user": {
+          "condition": "service_healthy"
+        },
+        "product": {
+          "condition": "service_healthy"
+        },
+        "order": {
+          "condition": "service_healthy"
+        },
+        "payment": {
+          "condition": "service_healthy"
+        },
+        "aftersale": {
+          "condition": "service_healthy"
+        },
+        "payment-simulator": {
+          "condition": "service_healthy"
+        },
+        "redis": {
+          "condition": "service_healthy"
+        }
+      },
+      "restart": "unless-stopped",
+      "ports": [
+        "127.0.0.1:8080:8080"
+      ]
+    },
+    "user": {
+      "image": "tradeflow/user:0.1.0-b8",
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile",
+        "args": {
+          "MODULE": "tradeflow-user"
+        }
+      },
+      "env_file": [
+        "../.local/deployment/user.env"
+      ],
+      "command": [
+        "--server.address=0.0.0.0",
+        "--management.server.address=0.0.0.0",
+        "--management.server.port=18081"
+      ],
+      "volumes": [
+        "../.local/deployment/jwt-public.pem:/keys/jwt-public.pem:ro",
+        "../.local/deployment/jwt-private.pem:/keys/jwt-private.pem:ro"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "curl --fail --silent http://127.0.0.1:18081/actuator/health/readiness >/dev/null"
+        ],
+        "interval": "15s",
+        "timeout": "5s",
+        "retries": 20,
+        "start_period": "60s"
+      },
+      "depends_on": {
+        "runtime-grants": {
+          "condition": "service_completed_successfully"
+        },
+        "rabbitmq": {
+          "condition": "service_healthy"
+        }
+      },
+      "restart": "unless-stopped"
+    },
+    "product": {
+      "image": "tradeflow/product:0.1.0-b8",
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile",
+        "args": {
+          "MODULE": "tradeflow-product"
+        }
+      },
+      "env_file": [
+        "../.local/deployment/product.env"
+      ],
+      "command": [
+        "--server.address=0.0.0.0",
+        "--management.server.address=0.0.0.0",
+        "--management.server.port=18082"
+      ],
+      "volumes": [
+        "../.local/deployment/jwt-public.pem:/keys/jwt-public.pem:ro"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "curl --fail --silent http://127.0.0.1:18082/actuator/health/readiness >/dev/null"
+        ],
+        "interval": "15s",
+        "timeout": "5s",
+        "retries": 20,
+        "start_period": "60s"
+      },
+      "depends_on": {
+        "runtime-grants": {
+          "condition": "service_completed_successfully"
+        },
+        "rabbitmq": {
+          "condition": "service_healthy"
+        },
+        "redis": {
+          "condition": "service_healthy"
+        }
+      },
+      "restart": "unless-stopped"
+    },
+    "order": {
+      "image": "tradeflow/order:0.1.0-b8",
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile",
+        "args": {
+          "MODULE": "tradeflow-order"
+        }
+      },
+      "env_file": [
+        "../.local/deployment/order.env"
+      ],
+      "command": [
+        "--server.address=0.0.0.0",
+        "--management.server.address=0.0.0.0",
+        "--management.server.port=18083"
+      ],
+      "volumes": [
+        "../.local/deployment/jwt-public.pem:/keys/jwt-public.pem:ro"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "curl --fail --silent http://127.0.0.1:18083/actuator/health/readiness >/dev/null"
+        ],
+        "interval": "15s",
+        "timeout": "5s",
+        "retries": 20,
+        "start_period": "60s"
+      },
+      "depends_on": {
+        "runtime-grants": {
+          "condition": "service_completed_successfully"
+        },
+        "rabbitmq": {
+          "condition": "service_healthy"
+        }
+      },
+      "restart": "unless-stopped"
+    },
+    "payment": {
+      "image": "tradeflow/payment:0.1.0-b8",
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile",
+        "args": {
+          "MODULE": "tradeflow-payment"
+        }
+      },
+      "env_file": [
+        "../.local/deployment/payment.env"
+      ],
+      "command": [
+        "--server.address=0.0.0.0",
+        "--management.server.address=0.0.0.0",
+        "--management.server.port=18084"
+      ],
+      "volumes": [
+        "../.local/deployment/jwt-public.pem:/keys/jwt-public.pem:ro"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "curl --fail --silent http://127.0.0.1:18084/actuator/health/readiness >/dev/null"
+        ],
+        "interval": "15s",
+        "timeout": "5s",
+        "retries": 20,
+        "start_period": "60s"
+      },
+      "depends_on": {
+        "runtime-grants": {
+          "condition": "service_completed_successfully"
+        },
+        "rabbitmq": {
+          "condition": "service_healthy"
+        }
+      },
+      "restart": "unless-stopped"
+    },
+    "aftersale": {
+      "image": "tradeflow/aftersale:0.1.0-b8",
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile",
+        "args": {
+          "MODULE": "tradeflow-aftersale"
+        }
+      },
+      "env_file": [
+        "../.local/deployment/aftersale.env"
+      ],
+      "command": [
+        "--server.address=0.0.0.0",
+        "--management.server.address=0.0.0.0",
+        "--management.server.port=18085"
+      ],
+      "volumes": [
+        "../.local/deployment/jwt-public.pem:/keys/jwt-public.pem:ro",
+        "../.local/deployment/evidence:/evidence"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "curl --fail --silent http://127.0.0.1:18085/actuator/health/readiness >/dev/null"
+        ],
+        "interval": "15s",
+        "timeout": "5s",
+        "retries": 20,
+        "start_period": "60s"
+      },
+      "depends_on": {
+        "runtime-grants": {
+          "condition": "service_completed_successfully"
+        },
+        "rabbitmq": {
+          "condition": "service_healthy"
+        }
+      },
+      "restart": "unless-stopped"
+    },
+    "payment-simulator": {
+      "image": "tradeflow/payment-simulator:0.1.0-b8",
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile",
+        "args": {
+          "MODULE": "tradeflow-payment-simulator"
+        }
+      },
+      "env_file": [
+        "../.local/deployment/payment_simulator.env"
+      ],
+      "command": [
+        "--server.address=0.0.0.0",
+        "--management.server.address=0.0.0.0",
+        "--management.server.port=18086"
+      ],
+      "volumes": [
+        "../.local/deployment/jwt-public.pem:/keys/jwt-public.pem:ro"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "curl --fail --silent http://127.0.0.1:18086/actuator/health/readiness >/dev/null"
+        ],
+        "interval": "15s",
+        "timeout": "5s",
+        "retries": 20,
+        "start_period": "60s"
+      },
+      "depends_on": {
+        "runtime-grants": {
+          "condition": "service_completed_successfully"
+        },
+        "rabbitmq": {
+          "condition": "service_healthy"
+        }
+      },
+      "restart": "unless-stopped"
+    },
+    "web-user": {
+      "image": "tradeflow/web-user:0.1.0-b12",
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile.web",
+        "target": "web-user"
+      },
+      "ports": [
+        "127.0.0.1:18088:8080"
+      ],
+      "depends_on": {
+        "gateway": {
+          "condition": "service_healthy"
+        }
+      },
+      "read_only": true,
+      "tmpfs": [
+        "/tmp:rw,noexec,nosuid,size=32m,mode=1777"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q -O /dev/null http://127.0.0.1:8080/healthz"
+        ],
+        "interval": "15s",
+        "timeout": "3s",
+        "retries": 5,
+        "start_period": "10s"
+      },
+      "restart": "unless-stopped"
+    },
+    "web-admin": {
+      "image": "tradeflow/web-admin:0.1.0-b12",
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile.web",
+        "target": "web-admin"
+      },
+      "ports": [
+        "127.0.0.1:18089:8080"
+      ],
+      "depends_on": {
+        "gateway": {
+          "condition": "service_healthy"
+        }
+      },
+      "read_only": true,
+      "tmpfs": [
+        "/tmp:rw,noexec,nosuid,size=32m,mode=1777"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q -O /dev/null http://127.0.0.1:8080/healthz"
+        ],
+        "interval": "15s",
+        "timeout": "3s",
+        "retries": 5,
+        "start_period": "10s"
+      },
+      "restart": "unless-stopped"
+    },
+    "redis": {
+      "image": "redis:7.4.7-alpine",
+      "command": [
+        "redis-server",
+        "/usr/local/etc/redis/redis.conf"
+      ],
+      "volumes": [
+        "redis-data:/data",
+        "../.local/deployment/redis.conf:/usr/local/etc/redis/redis.conf:ro",
+        "../.local/deployment/redis-password:/run/secrets/redis-password:ro"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "REDISCLI_AUTH=\"$$(cat /run/secrets/redis-password)\" redis-cli ping | grep -q PONG"
+        ],
+        "interval": "10s",
+        "timeout": "3s",
+        "retries": 10
+      },
+      "restart": "unless-stopped",
+      "mem_limit": "192m"
+    }
+  },
+  "volumes": {
+    "mysql-data": {},
+    "rabbit-data": {},
+    "redis-data": {}
+  }
+}

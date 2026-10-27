@@ -1,0 +1,9 @@
+<script setup lang="ts">
+import { onMounted,ref } from 'vue'
+import { session, initSession, logout, can, LoginPanel, Feedback } from '@tradeflow/ui'
+import { ShoppingBag, ArrowRight, Package, LifeBuoy } from 'lucide-vue-next'
+import './style.css'
+const bootError=ref('')
+onMounted(async()=>{try{await initSession()}catch(e){bootError.value=e instanceof Error?e.message:'会话恢复失败，请重新登录'}})
+</script>
+<template><div class="user-app"><header class="site-header"><RouterLink class="brand" to="/" aria-label="TradeFlow 首页"><span class="brand-mark"><Package :size="23" /></span>TradeFlow<span class="brand-tag">交易有序，进度清晰</span></RouterLink><nav aria-label="主导航"><RouterLink v-if="!session.user || can('SHOP')" to="/">选购商品</RouterLink><RouterLink v-if="can('ORDERS')" to="/orders">我的订单</RouterLink><RouterLink v-if="can('AFTERSALES')" to="/aftersales">售后服务</RouterLink><RouterLink v-if="session.user" to="/account">账号与地址</RouterLink><RouterLink v-if="can('AFTERSALES')" to="/disputes">平台介入</RouterLink><RouterLink v-if="can('SHOP')" to="/cart" class="bag-link"><ShoppingBag :size="18" />购物袋</RouterLink></nav><div class="identity" v-if="session.user"><span>{{session.user.displayName || session.user.username}}</span><button class="text-button" @click="logout()">退出</button></div></header><div class="service-strip"><span><Package :size="16" /> 选购与下单</span><ArrowRight :size="14"/><span>支付与履约</span><ArrowRight :size="14"/><span><LifeBuoy :size="16"/>售后有据可查</span></div><main class="main-shell"><Feedback :error="bootError"/><LoginPanel v-if="session.ready && !session.user"/><RouterView v-if="session.ready" :key="`${session.user?.userId || 'guest'}:${$route.fullPath}`"/><p v-else role="status">正在恢复当前会话…</p></main><footer class="site-footer"><strong>TradeFlow</strong><span>每一笔交易，都有清晰的下一步。</span><span>金额以最终订单报价为准</span></footer></div></template>

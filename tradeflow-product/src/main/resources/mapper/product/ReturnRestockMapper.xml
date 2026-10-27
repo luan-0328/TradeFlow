@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.product.infrastructure.ReturnRestockMapper">
+    <resultMap id="RestockViewMap" type="com.tradeflow.contracts.RefundContracts$RestockView">
+        <constructor>
+            <arg column="receipt_no" javaType="java.lang.String"/>
+            <arg column="order_no" javaType="java.lang.String"/>
+            <arg column="reservation_no" javaType="java.lang.String"/>
+            <arg column="source_no" javaType="java.lang.String"/>
+            <arg column="status" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="ReturnLineMap" type="com.tradeflow.contracts.RefundContracts$ReturnLine">
+        <constructor>
+            <arg column="order_item_id" javaType="java.lang.String"/>
+            <arg column="unit_no" javaType="_int"/>
+            <arg column="sku_id" javaType="java.lang.String"/>
+            <arg column="disposition" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <select id="find" resultMap="RestockViewMap">
+        SELECT receipt_no,order_no,reservation_no,source_no,'APPLIED' status FROM return_restock WHERE receipt_no=#{receiptNo}
+    </select>
+
+    <select id="lines" resultMap="ReturnLineMap">
+        SELECT CAST(order_item_id AS CHAR) order_item_id,unit_no,CAST(sku_id AS CHAR) sku_id,disposition FROM return_restock_item WHERE receipt_no=#{receiptNo} ORDER BY order_item_id,unit_no
+    </select>
+
+    <select id="count" resultType="int">
+        SELECT COUNT(*) FROM return_restock WHERE reservation_no=#{reservationNo}
+    </select>
+
+    <select id="returned" resultType="int">
+        SELECT COUNT(*) FROM return_restock_item WHERE reservation_no=#{reservationNo} AND sku_id=#{skuId}
+    </select>
+
+    <insert id="insert">
+        INSERT INTO return_restock(receipt_no,order_no,reservation_no,source_no) VALUES(#{receiptNo},#{orderNo},#{reservationNo},#{sourceNo})
+    </insert>
+
+    <insert id="item">
+        INSERT INTO return_restock_item(receipt_no,order_no,reservation_no,order_item_id,unit_no,sku_id,disposition) VALUES(#{command.receiptNo},#{command.orderNo},#{command.reservationNo},#{line.orderItemId},#{line.unitNo},#{line.skuId},#{line.disposition})
+    </insert>
+</mapper>

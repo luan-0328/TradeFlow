@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.order.infrastructure.OrderUpgradeMapper">
+  <select id="shipping" resultType="map">SELECT merchant_id,fee_cents,version FROM merchant_shipping_rule WHERE merchant_id=#{merchantId}</select>
+  <insert id="ensureShipping">INSERT INTO merchant_shipping_rule(merchant_id) VALUES(#{merchantId}) ON DUPLICATE KEY UPDATE merchant_id=merchant_id</insert>
+  <select id="lockShipping" resultType="map">SELECT merchant_id,fee_cents,version FROM merchant_shipping_rule WHERE merchant_id=#{merchantId} FOR UPDATE</select>
+  <select id="shippingCommand" resultType="map">SELECT request_hash,merchant_id,fee_cents,rule_version FROM shipping_rule_command WHERE actor_id=#{actor} AND request_key=#{key}</select>
+  <insert id="saveShippingCommand">INSERT INTO shipping_rule_command(actor_id,request_key,request_hash,merchant_id,fee_cents,rule_version) VALUES(#{actor},#{key},#{hash},#{merchantId},#{fee},#{version})</insert>
+  <update id="shippingUpdate">UPDATE merchant_shipping_rule SET fee_cents=#{fee},version=version+1 WHERE merchant_id=#{merchantId} AND version=#{version}</update>
+  <insert id="charge">INSERT INTO order_charge_snapshot(order_no,merchant_id,shipping_cents,shipping_version) VALUES(#{orderNo},#{merchantId},#{fee},#{version})</insert>
+  <select id="chargeByOrder" resultType="map">SELECT merchant_id,shipping_cents,shipping_version FROM order_charge_snapshot WHERE order_no=#{orderNo}</select>
+  <insert id="groupClaim">INSERT INTO trade_group(group_no,user_id,idempotency_key,request_hash) VALUES(#{groupNo},#{userId},#{key},#{hash}) ON DUPLICATE KEY UPDATE group_no=group_no</insert>
+  <select id="groupByKey" resultType="map">SELECT group_no,user_id,request_hash,created_at FROM trade_group WHERE user_id=#{userId} AND idempotency_key=#{key} FOR UPDATE</select>
+  <select id="group" resultType="map">SELECT group_no,user_id,created_at FROM trade_group WHERE group_no=#{groupNo}</select>
+  <insert id="child">INSERT INTO trade_group_child(group_no,merchant_id,order_no) VALUES(#{groupNo},#{merchantId},#{orderNo})</insert>
+  <select id="children" resultType="map">SELECT c.merchant_id AS merchantId,c.order_no AS orderNo,COALESCE(o.status,i.state) AS status,i.result_code AS resultCode,o.total_amount_cents AS amountCents,s.shipping_cents AS shippingCents FROM trade_group_child c JOIN order_creation_intent i ON i.order_no=c.order_no LEFT JOIN orders o ON o.order_no=c.order_no LEFT JOIN order_charge_snapshot s ON s.order_no=c.order_no WHERE c.group_no=#{groupNo} ORDER BY c.merchant_id</select>
+  <select id="groups" resultType="map">SELECT group_no,user_id,created_at FROM trade_group WHERE user_id=#{userId} ORDER BY created_at DESC,group_no DESC LIMIT #{size} OFFSET #{offset}</select>
+  <select id="settlement" resultType="map">SELECT order_no AS orderNo,user_id AS userId,merchant_id AS merchantId,status,completed_at AS receivedAt,EXISTS(SELECT 1 FROM order_item i JOIN order_item_unit u ON u.order_item_id=i.id WHERE i.order_no=o.order_no AND (u.active_aftersale_no IS NOT NULL OR u.reserved_refund_cents&gt;0)) AS hasActiveAftersale FROM orders o WHERE order_no=#{orderNo}</select>
+  <select id="timeline" resultType="map">SELECT from_status AS fromStatus,to_status AS toStatus,operation AS eventType,reason,created_at AS createdAt FROM order_status_log WHERE order_no=#{orderNo} ORDER BY id</select>
+  <sql id="orderFilter">user_id=#{userId}<if test="status != null and status != ''"> AND status=#{status}</if><if test="no != null and no != ''"> AND order_no=#{no}</if></sql>
+  <select id="searchOrders" resultType="string">SELECT order_no FROM orders WHERE <include refid="orderFilter"/> ORDER BY created_at DESC,id DESC LIMIT #{size} OFFSET #{offset}</select>
+  <select id="countOrders" resultType="long">SELECT COUNT(*) FROM orders WHERE <include refid="orderFilter"/></select>
+</mapper>

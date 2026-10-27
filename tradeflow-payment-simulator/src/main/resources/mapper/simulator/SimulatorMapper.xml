@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.paymentsimulator.infrastructure.SimulatorMapper">
+  <resultMap id="channelResult" type="com.tradeflow.paymentsimulator.domain.SimulatorRows$Channel">
+    <constructor>
+      <arg column="payment_no" name="paymentNo" javaType="string"/>
+      <arg column="order_no" name="orderNo" javaType="string"/>
+      <arg column="amount_cents" name="amountCents" javaType="_long"/>
+      <arg column="currency" name="currency" javaType="string"/>
+      <arg column="status" name="status" javaType="string"/>
+      <arg column="channel_transaction_no" name="channelTransactionNo" javaType="string"/>
+      <arg column="channel_version" name="channelVersion" javaType="_long"/>
+      <arg column="updated_at" name="updatedAt" javaType="java.time.Instant"/>
+      <arg column="succeeded_at" name="succeededAt" javaType="java.time.Instant"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="scenarioResult" type="com.tradeflow.paymentsimulator.domain.SimulatorRows$Scenario">
+    <constructor>
+      <arg column="payment_no" name="paymentNo" javaType="string"/>
+      <arg column="mode" name="mode" javaType="string"/>
+    </constructor>
+  </resultMap>
+
+  <insert id="ensure">
+    INSERT INTO channel_transaction(payment_no,order_no,amount_cents,currency,status,channel_transaction_no)
+    VALUES(#{channelCommand.paymentNo},#{channelCommand.orderNo},#{channelCommand.amountCents},#{channelCommand.currency},'PENDING',#{channelTransactionNo})
+    ON DUPLICATE KEY UPDATE payment_no=payment_no
+  </insert>
+
+  <select id="lock" resultMap="channelResult">
+    SELECT payment_no,order_no,amount_cents,currency,status,channel_transaction_no,channel_version,updated_at,succeeded_at
+    FROM channel_transaction
+    WHERE payment_no=#{paymentNo} FOR UPDATE
+  </select>
+
+  <select id="find" resultMap="channelResult">
+    SELECT payment_no,order_no,amount_cents,currency,status,channel_transaction_no,channel_version,updated_at,succeeded_at
+    FROM channel_transaction
+    WHERE payment_no=#{paymentNo}
+  </select>
+
+  <update id="transition">
+    UPDATE channel_transaction
+    SET status=#{status},channel_version=channel_version+1,updated_at=UTC_TIMESTAMP(3),succeeded_at=CASE WHEN #{status}='SUCCEEDED' THEN UTC_TIMESTAMP(3) ELSE succeeded_at END
+    WHERE payment_no=#{paymentNo}
+      AND status IN ('PENDING','PROCESSING')
+  </update>
+
+  <insert id="defaultScenario">
+    INSERT INTO fault_scenario(payment_no,mode,actor_id,reason)
+    VALUES(#{paymentNo},'SUCCESS','SYSTEM','首次支付绑定默认场景')
+    ON DUPLICATE KEY UPDATE payment_no=payment_no
+  </insert>
+
+  <insert id="scenario">
+    INSERT INTO fault_scenario(payment_no,mode,actor_id,reason)
+    VALUES(#{paymentNo},#{mode},#{actorId},#{reason})
+  </insert>
+
+  <select id="scenarioLock" resultMap="scenarioResult">
+    SELECT payment_no,mode
+    FROM fault_scenario
+    WHERE payment_no=#{paymentNo} FOR UPDATE
+  </select>
+
+  <insert id="process">
+    INSERT INTO process_task(task_no,payment_no,next_retry_at)
+    VALUES(#{taskNo},#{paymentNo},UTC_TIMESTAMP(3)+INTERVAL 5 SECOND)
+    ON DUPLICATE KEY UPDATE task_no=task_no
+  </insert>
+
+  <insert id="callback">
+    INSERT INTO callback_task(task_no,payment_no,payload,deliveries_required)
+    VALUES(#{taskNo},#{paymentNo},#{payload},#{deliveriesRequired})
+    ON DUPLICATE KEY UPDATE task_no=task_no
+  </insert>
+
+  <insert id="audit">
+    INSERT INTO audit_log(actor_id,action,business_no,request_id,reason,result)
+    VALUES(#{actorId},#{action},#{businessNo},#{requestId},#{reason},#{result})
+  </insert>
+</mapper>

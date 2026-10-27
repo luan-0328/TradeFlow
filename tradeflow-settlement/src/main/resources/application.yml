@@ -1,0 +1,129 @@
+server:
+  port: ${SERVER_PORT:8087}
+  address: ${BIND_ADDRESS:127.0.0.1}
+  shutdown: graceful
+spring:
+  application:
+    name: tradeflow-settlement
+  profiles:
+    default: dev
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13316}/trade_settlement?useUnicode=true&characterEncoding=UTF-8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
+    username: ${TRADEFLOW_SETTLEMENT_DB_USER}
+    password: ${TRADEFLOW_SETTLEMENT_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 1
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+      connection-init-sql: SET time_zone = '+00:00'
+  flyway:
+    enabled: false
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+  cloud:
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:18848}
+      username: ${NACOS_USERNAME:}
+      password: ${NACOS_PASSWORD:}
+      discovery:
+        enabled: true
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:TRADEFLOW}
+        ip: ${NACOS_DISCOVERY_IP:127.0.0.1}
+      config:
+        enabled: ${TRADEFLOW_NACOS_CONFIG_ENABLED:false}
+        import-check:
+          enabled: false
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:TRADEFLOW}
+    sentinel:
+      enabled: false
+    loadbalancer:
+      retry:
+        enabled: false
+  config:
+    import: ${NACOS_CONFIG_IMPORT:}
+management:
+  server:
+    port: ${MANAGEMENT_SERVER_PORT:18087}
+    address: ${MANAGEMENT_BIND_ADDRESS:127.0.0.1}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  health:
+    rabbit:
+      enabled: false
+    redis:
+      enabled: false
+tradeflow:
+  monitoring-token: ${TRADEFLOW_MONITORING_TOKEN}
+  observability:
+    enabled: false
+  messaging:
+    enabled: false
+  service:
+    code: settlement
+    display-name: 模拟结算服务
+    capabilities: simulation-only,settlement-ledger,refund-reversal,debt-offset,leased-recovery,merchant-statements
+  security:
+    public-key: ${TRADEFLOW_JWT_PUBLIC_KEY}
+    issuer: ${TRADEFLOW_JWT_ISSUER:tradeflow}
+  internal:
+    settlement-token: ${TRADEFLOW_INTERNAL_SETTLEMENT_TOKEN}
+  settlement:
+    fee-bps: ${TRADEFLOW_SETTLEMENT_FEE_BPS:0}
+    freeze-days: ${TRADEFLOW_SETTLEMENT_FREEZE_DAYS:7}
+    worker-enabled: ${TRADEFLOW_SETTLEMENT_WORKER_ENABLED:true}
+    scan-delay-ms: ${TRADEFLOW_SETTLEMENT_SCAN_DELAY_MS:5000}
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: false
+info:
+  app:
+    stage: U4_SIMULATED_SETTLEMENT
+logging:
+  structured:
+    format:
+      console: logstash
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+        register-enabled: false
+      config:
+        enabled: false
+tradeflow:
+  settlement:
+    worker-enabled: false
+management:
+  server:
+    port: -1
+---
+server:
+  address: ${BIND_ADDRESS:0.0.0.0}
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/trade_settlement?useUnicode=true&characterEncoding=UTF-8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
+  cloud:
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      discovery:
+        ip: ${NACOS_DISCOVERY_IP:}

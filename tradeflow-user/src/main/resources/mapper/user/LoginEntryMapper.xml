@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.user.infrastructure.LoginEntryMapper">
+  <!-- 保留原SQL的事务前提、条件更新、锁顺序及租约围栏；业务说明见Mapper方法中文注释。 -->
+  <resultMap id="windowResult" type="com.tradeflow.user.infrastructure.LoginEntryMapper$Window">
+    <constructor>
+      <arg column="attempts" name="attempts" javaType="_int"/>
+      <arg column="window_id" name="windowId" javaType="_long"/>
+      <arg column="retry_after_seconds" name="retryAfterSeconds" javaType="_int"/>
+    </constructor>
+  </resultMap>
+
+  <insert id="reserve">
+    INSERT INTO login_entry_window(attempt_key,window_id,attempts,updated_at)
+    VALUES(#{attemptKey},FLOOR(UNIX_TIMESTAMP()/#{windowSeconds}),1,UTC_TIMESTAMP(3))
+    ON DUPLICATE KEY UPDATE attempts=IF(window_id&gt;=FLOOR(UNIX_TIMESTAMP()/#{windowSeconds}),LEAST(attempts+1,#{maximumAttempts}+1),1),window_id=GREATEST(window_id,FLOOR(UNIX_TIMESTAMP()/#{windowSeconds})),updated_at=UTC_TIMESTAMP(3)
+  </insert>
+
+  <select id="current" resultMap="windowResult">
+    SELECT attempts,window_id,GREATEST(1,CEIL(#{windowSeconds}-MOD(UNIX_TIMESTAMP(),#{windowSeconds}))) AS retry_after_seconds
+    FROM login_entry_window
+    WHERE attempt_key=#{attemptKey}
+  </select>
+
+  <update id="release">
+    UPDATE login_entry_window
+    SET attempts=GREATEST(attempts-1,0)
+    WHERE attempt_key=#{attemptKey} AND window_id=#{windowId}
+  </update>
+
+  <delete id="cleanup">
+    DELETE
+    FROM login_entry_window
+    WHERE updated_at&lt;UTC_TIMESTAMP(3)-INTERVAL 7 DAY
+    LIMIT 500
+  </delete>
+</mapper>

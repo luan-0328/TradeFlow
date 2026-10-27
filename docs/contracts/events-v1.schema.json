@@ -1,0 +1,931 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tradeflow.local/contracts/events-v1.schema.json",
+  "title": "TradeFlow B5消息契约 v1",
+  "description": "8种已实现事件。允许兼容新增非必填字段；未知版本/类型隔离。资金payload为完整ChannelFact，原ID/原正文稳定，聚合版本不能作为丢弃资金事实依据。",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "eventType": {
+          "const": "PaymentSucceeded"
+        },
+        "eventVersion": {
+          "type": "integer",
+          "const": 1
+        },
+        "aggregateType": {
+          "const": "PAYMENT"
+        },
+        "aggregateId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "aggregateVersion": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "correlationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "causationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "traceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "orderNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            },
+            "paymentNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            },
+            "amountCents": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000000
+            },
+            "currency": {
+              "const": "CNY"
+            },
+            "status": {
+              "const": "SUCCEEDED"
+            },
+            "channelVersion": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "succeededAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "channelTransactionNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            }
+          },
+          "required": [
+            "orderNo",
+            "paymentNo",
+            "amountCents",
+            "currency",
+            "status",
+            "channelVersion",
+            "updatedAt",
+            "succeededAt",
+            "channelTransactionNo"
+          ],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "eventId",
+        "eventType",
+        "eventVersion",
+        "aggregateType",
+        "aggregateId",
+        "aggregateVersion",
+        "occurredAt",
+        "correlationId",
+        "causationId",
+        "traceId",
+        "payload"
+      ],
+      "additionalProperties": true
+    },
+    {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "eventType": {
+          "const": "PaymentFailed"
+        },
+        "eventVersion": {
+          "type": "integer",
+          "const": 1
+        },
+        "aggregateType": {
+          "const": "PAYMENT"
+        },
+        "aggregateId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "aggregateVersion": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "correlationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "causationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "traceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "orderNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            },
+            "paymentNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            },
+            "amountCents": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000000
+            },
+            "currency": {
+              "const": "CNY"
+            },
+            "status": {
+              "const": "FAILED"
+            },
+            "channelVersion": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "succeededAt": {
+              "type": "null"
+            },
+            "channelTransactionNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            }
+          },
+          "required": [
+            "orderNo",
+            "paymentNo",
+            "amountCents",
+            "currency",
+            "status",
+            "channelVersion",
+            "updatedAt",
+            "succeededAt",
+            "channelTransactionNo"
+          ],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "eventId",
+        "eventType",
+        "eventVersion",
+        "aggregateType",
+        "aggregateId",
+        "aggregateVersion",
+        "occurredAt",
+        "correlationId",
+        "causationId",
+        "traceId",
+        "payload"
+      ],
+      "additionalProperties": true
+    },
+    {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "eventType": {
+          "const": "PaymentClosed"
+        },
+        "eventVersion": {
+          "type": "integer",
+          "const": 1
+        },
+        "aggregateType": {
+          "const": "PAYMENT"
+        },
+        "aggregateId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "aggregateVersion": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "correlationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "causationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "traceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "orderNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            },
+            "paymentNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            },
+            "amountCents": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000000
+            },
+            "currency": {
+              "const": "CNY"
+            },
+            "status": {
+              "const": "CLOSED"
+            },
+            "channelVersion": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "succeededAt": {
+              "type": "null"
+            },
+            "channelTransactionNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            }
+          },
+          "required": [
+            "orderNo",
+            "paymentNo",
+            "amountCents",
+            "currency",
+            "status",
+            "channelVersion",
+            "updatedAt",
+            "succeededAt",
+            "channelTransactionNo"
+          ],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "eventId",
+        "eventType",
+        "eventVersion",
+        "aggregateType",
+        "aggregateId",
+        "aggregateVersion",
+        "occurredAt",
+        "correlationId",
+        "causationId",
+        "traceId",
+        "payload"
+      ],
+      "additionalProperties": true
+    },
+    {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "eventType": {
+          "const": "RefundSucceeded"
+        },
+        "eventVersion": {
+          "type": "integer",
+          "const": 1
+        },
+        "aggregateType": {
+          "const": "REFUND"
+        },
+        "aggregateId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "aggregateVersion": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "correlationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "causationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "traceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "orderNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            },
+            "paymentNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            },
+            "amountCents": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000000
+            },
+            "currency": {
+              "const": "CNY"
+            },
+            "status": {
+              "const": "SUCCEEDED"
+            },
+            "channelVersion": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "succeededAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "refundNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            },
+            "sourceNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            },
+            "channelRefundNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            }
+          },
+          "required": [
+            "orderNo",
+            "paymentNo",
+            "amountCents",
+            "currency",
+            "status",
+            "channelVersion",
+            "updatedAt",
+            "succeededAt",
+            "refundNo",
+            "sourceNo",
+            "channelRefundNo"
+          ],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "eventId",
+        "eventType",
+        "eventVersion",
+        "aggregateType",
+        "aggregateId",
+        "aggregateVersion",
+        "occurredAt",
+        "correlationId",
+        "causationId",
+        "traceId",
+        "payload"
+      ],
+      "additionalProperties": true
+    },
+    {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "eventType": {
+          "const": "RefundFailed"
+        },
+        "eventVersion": {
+          "type": "integer",
+          "const": 1
+        },
+        "aggregateType": {
+          "const": "REFUND"
+        },
+        "aggregateId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "aggregateVersion": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "correlationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "causationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "traceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "orderNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            },
+            "paymentNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            },
+            "amountCents": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000000
+            },
+            "currency": {
+              "const": "CNY"
+            },
+            "status": {
+              "const": "FAILED"
+            },
+            "channelVersion": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "succeededAt": {
+              "type": "null"
+            },
+            "refundNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            },
+            "sourceNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            },
+            "channelRefundNo": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 64
+            }
+          },
+          "required": [
+            "orderNo",
+            "paymentNo",
+            "amountCents",
+            "currency",
+            "status",
+            "channelVersion",
+            "updatedAt",
+            "succeededAt",
+            "refundNo",
+            "sourceNo",
+            "channelRefundNo"
+          ],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "eventId",
+        "eventType",
+        "eventVersion",
+        "aggregateType",
+        "aggregateId",
+        "aggregateVersion",
+        "occurredAt",
+        "correlationId",
+        "causationId",
+        "traceId",
+        "payload"
+      ],
+      "additionalProperties": true
+    },
+    {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "eventType": {
+          "const": "OrderPaid"
+        },
+        "eventVersion": {
+          "type": "integer",
+          "const": 1
+        },
+        "aggregateType": {
+          "const": "ORDER"
+        },
+        "aggregateId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "aggregateVersion": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "correlationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "causationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "traceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "orderNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            },
+            "paymentNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            }
+          },
+          "required": [
+            "orderNo",
+            "paymentNo"
+          ],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "eventId",
+        "eventType",
+        "eventVersion",
+        "aggregateType",
+        "aggregateId",
+        "aggregateVersion",
+        "occurredAt",
+        "correlationId",
+        "causationId",
+        "traceId",
+        "payload"
+      ],
+      "additionalProperties": true
+    },
+    {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "eventType": {
+          "const": "OrderClosed"
+        },
+        "eventVersion": {
+          "type": "integer",
+          "const": 1
+        },
+        "aggregateType": {
+          "const": "ORDER"
+        },
+        "aggregateId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "aggregateVersion": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "correlationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "causationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "traceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "orderNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            },
+            "reason": {
+              "type": "string",
+              "maxLength": 255
+            }
+          },
+          "required": [
+            "orderNo",
+            "reason"
+          ],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "eventId",
+        "eventType",
+        "eventVersion",
+        "aggregateType",
+        "aggregateId",
+        "aggregateVersion",
+        "occurredAt",
+        "correlationId",
+        "causationId",
+        "traceId",
+        "payload"
+      ],
+      "additionalProperties": true
+    },
+    {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "eventType": {
+          "const": "AftersaleCompleted"
+        },
+        "eventVersion": {
+          "type": "integer",
+          "const": 1
+        },
+        "aggregateType": {
+          "const": "AFTERSALE"
+        },
+        "aggregateId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "aggregateVersion": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "correlationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "causationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "traceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_:.-]+$"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "orderNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            },
+            "aftersaleNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            },
+            "refundNo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_:.-]+$"
+            }
+          },
+          "required": [
+            "orderNo",
+            "aftersaleNo",
+            "refundNo"
+          ],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "eventId",
+        "eventType",
+        "eventVersion",
+        "aggregateType",
+        "aggregateId",
+        "aggregateVersion",
+        "occurredAt",
+        "correlationId",
+        "causationId",
+        "traceId",
+        "payload"
+      ],
+      "additionalProperties": true
+    }
+  ]
+}

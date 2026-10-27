@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.order.infrastructure.FulfillmentMapper">
+  <!-- 保留原SQL的事务前提、条件更新、锁顺序及租约围栏；业务说明见Mapper方法中文注释。 -->
+  <resultMap id="authorizationResult" type="com.tradeflow.contracts.RefundContracts$Authorization">
+    <constructor>
+      <arg column="source_no" name="sourceNo" javaType="java.lang.String"/>
+      <arg column="source_type" name="sourceType" javaType="java.lang.String"/>
+      <arg column="order_no" name="orderNo" javaType="java.lang.String"/>
+      <arg column="payment_no" name="paymentNo" javaType="java.lang.String"/>
+      <arg column="user_id" name="userId" javaType="java.lang.String"/>
+      <arg column="merchant_id" name="merchantId" javaType="java.lang.String"/>
+      <arg column="amount_cents" name="amountCents" javaType="_long"/>
+      <arg column="currency" name="currency" javaType="java.lang.String"/>
+      <arg column="state" name="state" javaType="java.lang.String"/>
+      <arg column="version" name="version" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <select id="auth" resultMap="authorizationResult">
+    SELECT source_no,source_type,order_no,payment_no,user_id,merchant_id,amount_cents,currency,state,version
+    FROM refund_authorization
+    WHERE source_no=#{sourceNo}
+  </select>
+
+  <select id="lockAuth" resultMap="authorizationResult">
+    SELECT source_no,source_type,order_no,payment_no,user_id,merchant_id,amount_cents,currency,state,version
+    FROM refund_authorization
+    WHERE source_no=#{sourceNo} FOR UPDATE
+  </select>
+
+  <insert id="insertAuth">
+    INSERT INTO refund_authorization(source_no,source_type,order_no,payment_no,user_id,merchant_id,amount_cents,currency,state)
+    VALUES(#{sourceNo},#{sourceType},#{orderNo},#{paymentNo},#{userId},#{merchantId},#{amountCents},#{currency},#{state})
+  </insert>
+
+  <select id="lockHolder" resultType="string">
+    SELECT locked_aftersale_no
+    FROM orders
+    WHERE order_no=#{orderNo}
+  </select>
+
+  <update id="hold">
+    UPDATE orders
+    SET fulfillment_lock='AFTERSALE',locked_aftersale_no=#{sourceNo},version=version+1
+    WHERE order_no=#{orderNo} AND status='PAID' AND fulfillment_lock='NONE'
+  </update>
+
+  <update id="unhold">
+    UPDATE orders
+    SET fulfillment_lock='NONE',locked_aftersale_no=NULL,version=version+1
+    WHERE order_no=#{orderNo} AND fulfillment_lock='AFTERSALE' AND locked_aftersale_no=#{sourceNo}
+  </update>
+
+  <select id="lockItems" resultType="long">
+    SELECT id
+    FROM order_item
+    WHERE order_no=#{orderNo}
+    ORDER BY id FOR UPDATE
+  </select>
+
+  <select id="lockUnits" resultType="map">
+    SELECT u.*,i.sku_id AS sku_id
+    FROM order_item_unit u
+    JOIN order_item i ON i.id=u.order_item_id
+    WHERE i.order_no=#{orderNo}
+    ORDER BY u.order_item_id,u.unit_no FOR UPDATE
+  </select>
+
+  <update id="reserveUnit">
+    UPDATE order_item_unit
+    SET reserved_refund_cents=paid_amount_cents,active_aftersale_no=#{sourceNo},version=version+1
+    WHERE id=#{id} AND active_aftersale_no IS NULL AND reserved_refund_cents=0 AND succeeded_refund_cents=0 AND return_state='NONE'
+  </update>
+
+  <update id="reserveItems">
+    UPDATE order_item
+    SET reserved_refund_cents=line_amount_cents,version=version+1
+    WHERE order_no=#{orderNo} AND reserved_refund_cents=0 AND succeeded_refund_cents=0
+  </update>
+
+  <update id="releaseUnits">
+    UPDATE order_item_unit u
+    JOIN order_item i ON i.id=u.order_item_id
+    SET u.reserved_refund_cents=0,u.active_aftersale_no=NULL,u.return_state=IF(u.return_state='RESERVED','NONE',u.return_state),u.version=u.version+1
+    WHERE i.order_no=#{orderNo} AND u.active_aftersale_no=#{sourceNo}
+  </update>
+
+  <update id="releaseItems">
+    UPDATE order_item
+    SET reserved_refund_cents=(SELECT COALESCE(SUM(u.reserved_refund_cents),0)
+    FROM order_item_unit u
+    WHERE u.order_item_id=order_item.id),succeeded_refund_cents=(SELECT COALESCE(SUM(u.succeeded_refund_cents),0)
+    FROM order_item_unit u
+    WHERE u.order_item_id=order_item.id),returned_qty=(SELECT COUNT(*)
+    FROM order_item_unit u
+    WHERE u.order_item_id=order_item.id AND u.return_state='RECEIVED'),version=version+1
+    WHERE order_no=#{orderNo}
+  </update>
+
+  <update id="transition">
+    UPDATE refund_authorization
+    SET state=#{toState}
+    WHERE source_no=#{sourceNo} AND state=#{fromState}
+  </update>
+
+  <update id="settling">
+    UPDATE refund_authorization
+    SET state='SETTLING',settled_refund_no=#{settledRefundNo}
+    WHERE source_no=#{sourceNo} AND state='EXECUTING' AND settled_refund_no IS NULL
+  </update>
+
+  <select id="settled" resultType="string">
+    SELECT settled_refund_no
+    FROM refund_authorization
+    WHERE source_no=#{sourceNo}
+  </select>
+
+  <update id="settleUnits">
+    UPDATE order_item_unit u
+    JOIN order_item i ON i.id=u.order_item_id
+    SET u.succeeded_refund_cents=u.succeeded_refund_cents+u.reserved_refund_cents,u.reserved_refund_cents=0,u.active_aftersale_no=NULL,u.version=u.version+1
+    WHERE i.order_no=#{orderNo} AND u.active_aftersale_no=#{sourceNo}
+  </update>
+
+  <update id="settleItems">
+    UPDATE order_item
+    SET reserved_refund_cents=(SELECT COALESCE(SUM(u.reserved_refund_cents),0)
+    FROM order_item_unit u
+    WHERE u.order_item_id=order_item.id),succeeded_refund_cents=(SELECT COALESCE(SUM(u.succeeded_refund_cents),0)
+    FROM order_item_unit u
+    WHERE u.order_item_id=order_item.id),returned_qty=(SELECT COUNT(*)
+    FROM order_item_unit u
+    WHERE u.order_item_id=order_item.id AND u.return_state='RECEIVED'),version=version+1
+    WHERE order_no=#{orderNo}
+  </update>
+
+  <update id="ship">
+    UPDATE orders
+    SET status='SHIPPED',shipped_at=UTC_TIMESTAMP(3),version=version+1
+    WHERE order_no=#{orderNo} AND status='PAID' AND fulfillment_lock='NONE' AND stock_sync_status='CONFIRMED'
+  </update>
+
+  <insert id="shipment">
+    INSERT INTO order_shipment(order_no,carrier,tracking_no,actor_id,request_hash)
+    VALUES(#{orderNo},#{carrier},#{trackingNo},#{actorId},#{requestHash})
+  </insert>
+
+  <select id="shipmentByOrder" resultType="map">
+    SELECT *
+    FROM order_shipment
+    WHERE order_no=#{orderNo}
+  </select>
+
+  <update id="receive">
+    UPDATE orders
+    SET status='COMPLETED',completed_at=UTC_TIMESTAMP(3),version=version+1
+    WHERE order_no=#{orderNo} AND status='SHIPPED'
+  </update>
+
+  <select id="merchantList" resultType="map">
+    SELECT order_no,payment_no,status,total_amount_cents,currency,stock_sync_status,fulfillment_lock,pay_deadline,shipped_at,completed_at,created_at
+    FROM orders
+    WHERE merchant_id=#{merchantId}
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="lateOrders" resultType="string">
+    SELECT o.order_no
+    FROM orders o
+    LEFT JOIN refund_authorization a ON a.source_no=CONCAT('CLOSE:',o.order_no)
+    WHERE o.close_phase='LATE_PAYMENT' AND a.source_no IS NULL
+    ORDER BY o.id
+    LIMIT 10
+  </select>
+
+  <select id="factHash" resultType="string">
+    SELECT payload_hash
+    FROM order_refund_fact
+    WHERE event_id=#{eventId}
+  </select>
+
+  <insert id="fact">
+    INSERT INTO order_refund_fact(event_id,source_no,refund_no,payload_hash,status)
+    VALUES(#{eventId},#{sourceNo},#{refundNo},#{payloadHash},#{status})
+  </insert>
+
+  <insert id="task">
+    INSERT INTO refund_flow_task(source_no,step)
+    VALUES(#{sourceNo},#{step})
+  </insert>
+
+  <update id="cancelled">
+    UPDATE orders
+    SET status='CANCELLED',stock_sync_status='RESTOCKED',fulfillment_lock='NONE',locked_aftersale_no=NULL,closed_at=UTC_TIMESTAMP(3),version=version+1
+    WHERE order_no=#{orderNo} AND status='PAID' AND fulfillment_lock='AFTERSALE' AND locked_aftersale_no=#{sourceNo}
+  </update>
+
+  <update id="closeLate">
+    UPDATE orders
+    SET status='CLOSED',stock_sync_status='RELEASED',closed_at=COALESCE(closed_at,UTC_TIMESTAMP(3)),close_reason='LATE_PAYMENT_REFUNDED',version=version+1
+    WHERE order_no=#{orderNo} AND status IN ('CLOSING','CLOSED') AND close_phase='LATE_PAYMENT'
+  </update>
+
+  <select id="due" resultType="map">
+    SELECT *
+    FROM refund_flow_task
+    WHERE (state='READY' AND next_retry_at&lt;=UTC_TIMESTAMP(3)) OR (state='RUNNING' AND lease_until&lt;UTC_TIMESTAMP(3))
+    ORDER BY created_at
+    LIMIT 1 FOR UPDATE SKIP LOCKED
+  </select>
+
+  <update id="claim">
+    UPDATE refund_flow_task
+    SET state='RUNNING',claim_version=claim_version+1,attempt_count=attempt_count+1,lease_owner=#{leaseOwner},lease_until=UTC_TIMESTAMP(3)+INTERVAL 30 SECOND
+    WHERE source_no=#{sourceNo}
+  </update>
+
+  <select id="fence" resultType="map">
+    SELECT *
+    FROM refund_flow_task
+    WHERE source_no=#{sourceNo} AND state='RUNNING' AND claim_version=#{claimVersion} AND lease_until&gt;UTC_TIMESTAMP(3) FOR UPDATE
+  </select>
+
+  <update id="taskResult">
+    UPDATE refund_flow_task
+    SET state=#{state},step=#{step},lease_until=NULL,last_error=#{lastError},next_retry_at=UTC_TIMESTAMP(3)+INTERVAL 5 SECOND
+    WHERE source_no=#{sourceNo} AND state='RUNNING' AND claim_version=#{claimVersion}
+  </update>
+
+  <insert id="claimOperation">
+    INSERT INTO idempotency_request(actor_type,actor_id,operation,idempotency_key,request_hash,business_no,state)
+    VALUES(#{actorType},#{actorId},#{operation},#{idempotencyKey},#{requestHash},#{businessNo},'SUCCEEDED')
+    ON DUPLICATE KEY UPDATE id=id
+  </insert>
+
+  <select id="operation" resultType="map">
+    SELECT request_hash,business_no
+    FROM idempotency_request
+    WHERE actor_type=#{actorType} AND actor_id=#{actorId} AND operation=#{operation} AND idempotency_key=#{idempotencyKey} FOR UPDATE
+  </select>
+
+  <select id="lockRefundTask" resultType="string">
+    SELECT source_no
+    FROM refund_flow_task
+    WHERE source_no=#{sourceNo} FOR UPDATE
+  </select>
+
+  <update id="beginSettlement">
+    UPDATE refund_flow_task
+    SET state='READY',step='SETTLE',attempt_count=0,claim_version=claim_version+1,lease_owner=NULL,lease_until=NULL,next_retry_at=UTC_TIMESTAMP(3),last_error=NULL
+    WHERE source_no=#{sourceNo}
+  </update>
+
+  <select id="refundTask" resultType="map">
+    SELECT *
+    FROM refund_flow_task
+    WHERE source_no=#{sourceNo}
+  </select>
+
+  <select id="refundTasks" resultType="map">
+    SELECT source_no,refund_no,step,state,attempt_count,last_error,next_retry_at,claim_version
+    FROM refund_flow_task
+    ORDER BY created_at DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <update id="restartRefund">
+    UPDATE refund_flow_task
+    SET state='READY',attempt_count=0,claim_version=claim_version+1,lease_owner=NULL,lease_until=NULL,next_retry_at=UTC_TIMESTAMP(3),last_error=NULL,refund_no=COALESCE(#{refundNo},refund_no)
+    WHERE source_no=#{sourceNo} AND state='MANUAL_REVIEW'
+  </update>
+</mapper>

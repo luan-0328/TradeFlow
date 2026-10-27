@@ -1,0 +1,71 @@
+name: tradeflow-infra
+
+# 本批提供基础设施模板；local 骨架不依赖这些容器。
+# 当前机器没有 Docker，镜像拉取、Nacos 初始化和容器部署尚未实测。
+services:
+  mysql:
+    image: mysql:8.0.46
+    profiles: [infra]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD}
+      TZ: UTC
+    command: [--character-set-server=utf8mb4, --collation-server=utf8mb4_0900_ai_ci, --default-time-zone=+00:00]
+    ports: ['127.0.0.1:13306:3306']
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/00_create_databases.sql:/docker-entrypoint-initdb.d/00_create_databases.sql:ro
+    healthcheck:
+      test: [CMD, mysqladmin, ping, -h, '127.0.0.1', --silent]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7.4.7-alpine
+    profiles: [infra]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+    command: [redis-server, --appendonly, 'yes', --requirepass, '${REDIS_PASSWORD:?set REDIS_PASSWORD}']
+    ports: ['127.0.0.1:16379:6379']
+    volumes: [redis-data:/data]
+    healthcheck:
+      test: [CMD-SHELL, 'REDISCLI_AUTH=$$REDIS_PASSWORD redis-cli ping']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4.1.8-management
+    profiles: [infra]
+    # 先运行Prepare-RabbitMQ.py生成受保护的角色定义/config；原生节点与容器二选一。
+    ports: ['127.0.0.1:5678:5672', '127.0.0.1:15678:15672']
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - ../.local/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+      - ../.local/rabbitmq/compose-rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  nacos:
+    image: nacos/nacos-server:v3.0.3
+    profiles: [infra]
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: 'true'
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN:?set a base64 secret of at least 32 bytes}
+      NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY:?set NACOS_AUTH_IDENTITY_KEY}
+      NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE:?set NACOS_AUTH_IDENTITY_VALUE}
+      JVM_XMS: 256m
+      JVM_XMX: 512m
+    ports: ['127.0.0.1:18848:8848', '127.0.0.1:19848:9848', '127.0.0.1:18880:8080']
+    volumes: [nacos-data:/home/nacos/data, nacos-logs:/home/nacos/logs]
+
+volumes:
+  mysql-data:
+  redis-data:
+  rabbitmq-data:
+  nacos-data:
+  nacos-logs:

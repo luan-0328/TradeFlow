@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.payment.infrastructure.PaymentMapper">
+  <select id="acceptedRequest" resultType="map">
+    SELECT p.*
+    FROM payment_order p
+    JOIN idempotency_request i ON i.business_no=p.payment_no
+    WHERE i.actor_type='USER'
+      AND i.actor_id=#{userId}
+      AND i.operation='SUBMIT_PAYMENT'
+      AND i.idempotency_key=#{idempotencyKey}
+      AND p.user_id=#{userId}
+      AND p.order_no=#{orderNo}
+  </select>
+
+  <select id="reconciliationLedgerCount" resultType="int">
+    SELECT COUNT(*)
+    FROM payment_ledger
+    WHERE business_no=#{businessNo}
+      AND entry_type='PAYMENT_SUCCEEDED'
+  </select>
+
+  <select id="find" resultType="map">
+    SELECT *
+    FROM payment_order
+    WHERE payment_no=#{paymentNo}
+  </select>
+
+  <select id="lock" resultType="map">
+    SELECT *
+    FROM payment_order
+    WHERE payment_no=#{paymentNo} FOR UPDATE
+  </select>
+
+  <insert id="ensure">
+    INSERT INTO payment_order(payment_no,order_no,user_id,amount_cents,currency)
+    VALUES(#{paymentNo},#{orderNo},#{userId},#{amountCents},#{currency})
+    ON DUPLICATE KEY UPDATE payment_no=payment_no
+  </insert>
+
+  <update id="closing">
+    UPDATE payment_order
+    SET close_intent='YES',version=version+1
+    WHERE payment_no=#{paymentNo}
+  </update>
+
+  <update id="fact">
+    UPDATE payment_order
+    SET status=#{status},channel_transaction_no=#{channelTransactionNo},channel_version=#{channelVersion},succeeded_at=#{succeededAt},channel_updated_at=#{updatedAt},last_error=NULL,version=version+1
+    WHERE payment_no=#{paymentNo}
+  </update>
+
+  <update id="issue">
+    UPDATE payment_order
+    SET last_error=#{lastError},review_required='YES',version=version+1
+    WHERE payment_no=#{paymentNo}
+  </update>
+
+  <update id="unknown">
+    UPDATE payment_order
+    SET status=IF(channel_version=0,'UNKNOWN',status),last_error='通道结果未知，恢复任务先查询原支付号',version=version+1
+    WHERE payment_no=#{paymentNo}
+      AND review_required='NO'
+      AND status NOT IN ('SUCCEEDED','FAILED','CLOSED')
+  </update>
+
+  <insert id="ledger">
+    INSERT INTO payment_ledger(business_no,payment_no,entry_type,direction,amount_cents,currency,occurred_at)
+    VALUES(#{paymentNo},#{paymentNo},'PAYMENT_SUCCEEDED','IN',#{amountCents},#{currency},#{succeededAt})
+  </insert>
+
+  <insert id="refundAccount">
+    INSERT INTO refund_account(payment_no,paid_amount_cents)
+    VALUES(#{paymentNo},#{amountCents})
+  </insert>
+
+  <insert id="idempotency">
+    INSERT INTO idempotency_request(actor_type,actor_id,operation,idempotency_key,request_hash,business_no,state)
+    VALUES('USER',#{actorId},'SUBMIT_PAYMENT',#{idempotencyKey},#{requestHash},#{businessNo},'SUCCEEDED')
+    ON DUPLICATE KEY UPDATE id=id
+  </insert>
+
+  <select id="idem" resultType="map">
+    SELECT *
+    FROM idempotency_request
+    WHERE actor_type='USER'
+      AND actor_id=#{actorId}
+      AND operation='SUBMIT_PAYMENT'
+      AND idempotency_key=#{idempotencyKey} FOR UPDATE
+  </select>
+
+  <insert id="ensureTask">
+    INSERT INTO process_task(task_no,task_type,business_no,step,payload,next_retry_at)
+    VALUES(#{taskNo},'PAYMENT',#{taskNo},'SUBMIT',JSON_OBJECT(),UTC_TIMESTAMP(3))
+    ON DUPLICATE KEY UPDATE id=id
+  </insert>
+
+  <select id="lockTask" resultType="map">
+    SELECT *
+    FROM process_task
+    WHERE task_no=#{taskNo} FOR UPDATE
+  </select>
+
+  <update id="closeTask">
+    UPDATE process_task
+    SET step=IF(state='RUNNING'
+      OR step='QUERY','QUERY','CLOSE'),state='READY',next_retry_at=UTC_TIMESTAMP(3),lease_until=NULL,claim_version=claim_version+1,version=version+1
+    WHERE task_no=#{taskNo}
+      AND state!='MANUAL_REVIEW'
+  </update>
+
+  <update id="closeOwnedTask">
+    UPDATE process_task
+    SET step='QUERY',state='READY',next_retry_at=UTC_TIMESTAMP(3),lease_until=NULL,claim_version=claim_version+1,version=version+1
+    WHERE task_no=#{taskNo}
+      AND state='RUNNING'
+      AND claim_version=#{claimVersion}
+      AND lease_owner=#{leaseOwner}
+      AND lease_until&gt;UTC_TIMESTAMP(3)
+  </update>
+
+  <update id="beforeSubmit">
+    UPDATE process_task
+    SET step='QUERY',version=version+1
+    WHERE task_no=#{taskNo}
+      AND step IN ('SUBMIT','CLOSE')
+  </update>
+
+  <select id="dueTask" resultType="string">
+    SELECT task_no
+    FROM process_task
+    WHERE task_type='PAYMENT'
+      AND ((state='READY'
+      AND next_retry_at&lt;=UTC_TIMESTAMP(3))
+      OR (state='RUNNING'
+      AND lease_until&lt;UTC_TIMESTAMP(3)))
+    ORDER BY id
+    LIMIT 1 FOR UPDATE SKIP LOCKED
+  </select>
+
+  <update id="claimTask">
+    UPDATE process_task
+    SET state='RUNNING',lease_owner=#{leaseOwner},lease_until=DATE_ADD(UTC_TIMESTAMP(3),INTERVAL 30 SECOND),attempt_count=attempt_count+1,claim_version=claim_version+1,version=version+1
+    WHERE task_no=#{taskNo}
+  </update>
+
+  <select id="fenceTask" resultType="map">
+    SELECT *
+    FROM process_task
+    WHERE task_no=#{taskNo}
+      AND state='RUNNING'
+      AND claim_version=#{claimVersion}
+      AND lease_owner=#{leaseOwner}
+      AND lease_until&gt;UTC_TIMESTAMP(3) FOR UPDATE
+  </select>
+
+  <update id="finishTask">
+    UPDATE process_task
+    SET state=#{state},step=#{step},last_error=#{lastError},manual_review_at=IF(#{state}='MANUAL_REVIEW',UTC_TIMESTAMP(3),manual_review_at),next_retry_at=DATE_ADD(UTC_TIMESTAMP(3),INTERVAL 3 SECOND),lease_until=NULL,version=version+1
+    WHERE task_no=#{taskNo}
+      AND claim_version=#{claimVersion}
+      AND lease_owner=#{leaseOwner}
+      AND lease_until&gt;UTC_TIMESTAMP(3)
+      AND state='RUNNING'
+  </update>
+
+  <select id="notification" resultType="map">
+    SELECT *
+    FROM channel_notification
+    WHERE notification_no=#{notificationNo} FOR UPDATE
+  </select>
+
+  <insert id="notificationInsert">
+    INSERT INTO channel_notification(notification_no,business_no,payload_hash,masked_payload,process_status)
+    VALUES(#{notificationNo},#{businessNo},#{payloadHash},'已验真支付事实','APPLIED')
+  </insert>
+
+  <update id="quarantine">
+    UPDATE channel_notification
+    SET process_status='QUARANTINED',reason='终态证据矛盾，人工核验',version=version+1
+    WHERE notification_no=#{notificationNo}
+  </update>
+
+  <insert id="outbox">
+    INSERT INTO outbox_event(event_id,aggregate_type,aggregate_id,aggregate_version,event_type,correlation_id,causation_id,trace_id,payload,next_retry_at)
+    VALUES(#{eventId},'PAYMENT',#{aggregateId},#{aggregateVersion},#{eventType},#{orderNo},#{aggregateId},#{eventId},#{payload},UTC_TIMESTAMP(3))
+  </insert>
+
+  <select id="dueEvent" resultType="map">
+    SELECT *
+    FROM outbox_event
+    WHERE aggregate_type='PAYMENT'
+      AND ((status='READY'
+      AND next_retry_at&lt;=UTC_TIMESTAMP(3))
+      OR (status='RUNNING'
+      AND lease_until&lt;UTC_TIMESTAMP(3)))
+    ORDER BY id
+    LIMIT 1 FOR UPDATE SKIP LOCKED
+  </select>
+
+  <update id="claimEvent">
+    UPDATE outbox_event
+    SET status='RUNNING',lease_owner=#{leaseOwner},lease_until=DATE_ADD(UTC_TIMESTAMP(3),INTERVAL 30 SECOND),claim_version=claim_version+1,attempt_count=attempt_count+1,version=version+1
+    WHERE event_id=#{eventId}
+  </update>
+
+  <update id="finishEvent">
+    UPDATE outbox_event
+    SET status=#{status},published_at=IF(#{status}='SENT',UTC_TIMESTAMP(3),NULL),lease_until=NULL,next_retry_at=DATE_ADD(UTC_TIMESTAMP(3),INTERVAL 5 SECOND),last_error=#{lastError},version=version+1
+    WHERE event_id=#{eventId}
+      AND claim_version=#{claimVersion}
+      AND status='RUNNING'
+  </update>
+
+  <insert id="audit">
+    INSERT INTO audit_log(actor_type,actor_id,action,business_no,request_id,trace_id,reason,change_summary)
+    VALUES('SERVICE','payment','CHANNEL_FACT_CONFLICT',#{businessNo},#{requestId},#{requestId},#{reason},JSON_OBJECT('disposition','MANUAL_REVIEW'))
+  </insert>
+
+  <select id="ledgerPage" resultType="map">
+    SELECT *
+    FROM payment_ledger
+    ORDER BY id DESC
+    LIMIT #{size}
+    OFFSET #{offset}
+  </select>
+
+  <select id="ledgerCount" resultType="long">
+    SELECT COUNT(*)
+    FROM payment_ledger
+  </select>
+</mapper>

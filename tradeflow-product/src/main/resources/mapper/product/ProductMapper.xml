@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.product.infrastructure.ProductMapper">
+    <resultMap id="ProductRowMap" type="com.tradeflow.product.domain.ProductRows$ProductRow">
+        <constructor>
+            <arg column="id" javaType="java.lang.String"/>
+            <arg column="merchant_id" javaType="java.lang.String"/>
+            <arg column="name" javaType="java.lang.String"/>
+            <arg column="description" javaType="java.lang.String"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="version" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="SkuRowMap" type="com.tradeflow.product.domain.ProductRows$SkuRow">
+        <constructor>
+            <arg column="id" javaType="java.lang.String"/>
+            <arg column="product_id" javaType="java.lang.String"/>
+            <arg column="sku_code" javaType="java.lang.String"/>
+            <arg column="specification" javaType="java.lang.String"/>
+            <arg column="price_cents" javaType="_long"/>
+            <arg column="price_version" javaType="_long"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="version" javaType="_long"/>
+            <arg column="merchant_id" javaType="java.lang.String"/>
+            <arg column="product_status" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="InventoryRowMap" type="com.tradeflow.product.domain.ProductRows$InventoryRow">
+        <constructor>
+            <arg column="available_qty" javaType="_long"/>
+            <arg column="reserved_qty" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="LedgerViewMap" type="com.tradeflow.product.api.ProductModels$LedgerView">
+        <constructor>
+            <arg column="business_no" javaType="java.lang.String"/>
+            <arg column="sku_id" javaType="java.lang.String"/>
+            <arg column="operation_type" javaType="java.lang.String"/>
+            <arg column="available_delta" javaType="_long"/>
+            <arg column="reserved_delta" javaType="_long"/>
+            <arg column="available_after" javaType="_long"/>
+            <arg column="reserved_after" javaType="_long"/>
+            <arg column="created_at" javaType="java.time.Instant"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="IdempotencyRowMap" type="com.tradeflow.product.domain.ProductRows$IdempotencyRow">
+        <constructor>
+            <arg column="request_hash" javaType="java.lang.String"/>
+            <arg column="state" javaType="java.lang.String"/>
+            <arg column="business_no" javaType="java.lang.String"/>
+            <arg column="result_snapshot" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <insert id="createProduct" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO product(merchant_id,name,description,status) VALUES(#{merchantId},#{name},#{description},#{status})
+    </insert>
+
+    <insert id="createSku" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sku(product_id,sku_code,specification,price_cents) VALUES(#{productId},#{skuCode},#{specification},#{priceCents})
+    </insert>
+
+    <insert id="zeroInventory">
+        INSERT INTO inventory(warehouse_id,sku_id) VALUES('warehouse_main',#{skuId})
+    </insert>
+
+    <select id="product" resultMap="ProductRowMap">
+        SELECT CAST(id AS CHAR) id,merchant_id,name,description,status,version FROM product WHERE id=#{id}
+    </select>
+
+    <select id="lockProduct" resultMap="ProductRowMap">
+        SELECT CAST(id AS CHAR) id,merchant_id,name,description,status,version FROM product WHERE id=#{id} FOR UPDATE
+    </select>
+
+    <select id="products" resultMap="ProductRowMap">
+        SELECT CAST(id AS CHAR) id,merchant_id,name,description,status,version FROM product WHERE (#{merchantId} IS NULL AND status='ON_SALE') OR merchant_id=#{merchantId} ORDER BY id DESC LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countProducts" resultType="long">
+        SELECT COUNT(*) FROM product WHERE (#{merchantId} IS NULL AND status='ON_SALE') OR merchant_id=#{merchantId}
+    </select>
+
+    <!-- LOCATE将百分号、下划线等作为普通字符处理；公开查询永远不通过merchantId绕过上架限制。 -->
+    <sql id="searchFilter">
+        <where>
+            <if test="!merchant">status='ON_SALE'</if>
+            <if test="merchantId != null">AND merchant_id=#{merchantId}</if>
+            <if test="keyword != null and keyword != ''">AND (LOCATE(#{keyword},name)&gt;0 OR LOCATE(#{keyword},description)&gt;0)</if>
+        </where>
+    </sql>
+    <select id="searchProducts" resultMap="ProductRowMap">
+        SELECT CAST(id AS CHAR) id,merchant_id,name,description,status,version FROM product <include refid="searchFilter"/> ORDER BY id DESC LIMIT #{size} OFFSET #{offset}
+    </select>
+    <select id="countSearchProducts" resultType="long">
+        SELECT COUNT(*) FROM product <include refid="searchFilter"/>
+    </select>
+
+    <select id="skus" resultMap="SkuRowMap">
+        SELECT CAST(s.id AS CHAR) id,CAST(s.product_id AS CHAR) product_id,s.sku_code,s.specification,s.price_cents,s.price_version,s.status,s.version,p.merchant_id,p.status product_status FROM sku s JOIN product p ON p.id=s.product_id WHERE s.product_id=#{productId} ORDER BY s.id
+    </select>
+
+    <select id="sku" resultMap="SkuRowMap">
+        SELECT CAST(s.id AS CHAR) id,CAST(s.product_id AS CHAR) product_id,s.sku_code,s.specification,s.price_cents,s.price_version,s.status,s.version,p.merchant_id,p.status product_status FROM sku s JOIN product p ON p.id=s.product_id WHERE s.id=#{id}
+    </select>
+
+    <select id="quoteSku" resultMap="SkuRowMap">
+        SELECT CAST(s.id AS CHAR) id,CAST(s.product_id AS CHAR) product_id,s.sku_code,s.specification,s.price_cents,s.price_version,s.status,s.version,p.merchant_id,p.status product_status FROM sku s JOIN product p ON p.id=s.product_id WHERE s.id=#{id} FOR SHARE
+    </select>
+
+    <update id="editProduct">
+        UPDATE product SET name=#{name},description=#{description},status=#{status},version=version+1 WHERE id=#{id} AND merchant_id=#{merchantId} AND version=#{version}
+    </update>
+
+    <update id="editSku">
+        UPDATE sku SET price_version=price_version+IF(price_cents&lt;&gt;#{priceCents},1,0),price_cents=#{priceCents},status=#{status},version=version+1 WHERE id=#{id} AND version=#{version}
+    </update>
+
+    <select id="inventory" resultMap="InventoryRowMap">
+        SELECT available_qty,reserved_qty FROM inventory WHERE warehouse_id=#{warehouseId} AND sku_id=#{skuId}
+    </select>
+
+    <select id="lockInventory" resultMap="InventoryRowMap">
+        SELECT available_qty,reserved_qty FROM inventory WHERE warehouse_id=#{warehouseId} AND sku_id=#{skuId} FOR UPDATE
+    </select>
+
+    <update id="adjust">
+        UPDATE inventory SET available_qty=available_qty+#{delta},version=version+1 WHERE warehouse_id=#{warehouseId} AND sku_id=#{skuId} AND available_qty+#{delta}&gt;=0 AND available_qty+reserved_qty+#{delta}&lt;=1000000000
+    </update>
+
+    <insert id="receipt">
+        INSERT INTO inventory_receipt(receipt_no,receipt_type,source_no,merchant_id,status,reason,operator_id) VALUES(#{receiptNo},'ADJUSTMENT',#{receiptNo},#{merchantId},'APPLIED',#{reason},#{operatorId})
+    </insert>
+
+    <insert id="receiptItem">
+        INSERT INTO receipt_item(receipt_no,warehouse_id,sku_id,quantity_delta) VALUES(#{receiptNo},#{warehouseId},#{skuId},#{quantityDelta})
+    </insert>
+
+    <insert id="ledger">
+        INSERT INTO inventory_ledger(business_no,operation_type,warehouse_id,sku_id,available_delta,reserved_delta,available_after,reserved_after) VALUES(#{businessNo},'ADJUSTMENT',#{warehouseId},#{skuId},#{availableDelta},0,#{availableAfter},#{reservedAfter})
+    </insert>
+
+    <select id="ledgers" resultMap="LedgerViewMap">
+        SELECT l.business_no,CAST(l.sku_id AS CHAR) sku_id,l.operation_type,l.available_delta,l.reserved_delta,l.available_after,l.reserved_after,l.created_at FROM inventory_ledger l JOIN sku s ON s.id=l.sku_id JOIN product p ON p.id=s.product_id WHERE p.merchant_id=#{merchantId} ORDER BY l.id DESC LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countLedgers" resultType="long">
+        SELECT COUNT(*) FROM inventory_ledger l JOIN sku s ON s.id=l.sku_id JOIN product p ON p.id=s.product_id WHERE p.merchant_id=#{merchantId}
+    </select>
+
+    <insert id="claim">
+        INSERT INTO idempotency_request(actor_type,actor_id,operation,idempotency_key,request_hash,business_no) VALUES(#{actorType},#{actorId},#{operation},#{idempotencyKey},#{requestHash},#{businessNo}) ON DUPLICATE KEY UPDATE id=id
+    </insert>
+
+    <select id="lockRequest" resultMap="IdempotencyRowMap">
+        SELECT request_hash,state,business_no,result_snapshot FROM idempotency_request WHERE actor_type=#{actorType} AND actor_id=#{actorId} AND operation=#{operation} AND idempotency_key=#{idempotencyKey} FOR UPDATE
+    </select>
+
+    <!-- 旧请求只用原成功快照与原单据证明归属，不通过当前请求的merchantId推断；此查询不改写旧摘要。 -->
+    <select id="legacyRequestMerchant" resultType="string">
+        <choose>
+            <when test="operation == 'CREATE_PRODUCT'">
+                SELECT JSON_UNQUOTE(JSON_EXTRACT(#{snapshot},'$.merchantId'))
+            </when>
+            <when test="operation == 'ADJUST_INVENTORY'">
+                SELECT merchant_id FROM inventory_receipt WHERE receipt_no=#{businessNo}
+                    AND receipt_no=JSON_UNQUOTE(JSON_EXTRACT(#{snapshot},'$.businessNo'))
+            </when>
+            <when test="operation == 'CHANGE_INVENTORY_CONDITION'">
+                SELECT p.merchant_id FROM inventory_condition_operation o JOIN sku s ON s.id=o.sku_id JOIN product p ON p.id=s.product_id
+                WHERE o.operation_no=#{businessNo} AND o.operation_no=JSON_UNQUOTE(JSON_EXTRACT(#{snapshot},'$.operationNo'))
+                    AND CAST(o.sku_id AS CHAR)=JSON_UNQUOTE(JSON_EXTRACT(#{snapshot},'$.skuId'))
+            </when>
+            <otherwise>SELECT NULL</otherwise>
+        </choose>
+    </select>
+
+    <update id="completed">
+        UPDATE idempotency_request SET state='SUCCEEDED',result_code='OK',result_snapshot=#{resultSnapshot},version=version+1 WHERE actor_type=#{actorType} AND actor_id=#{actorId} AND operation=#{operation} AND idempotency_key=#{idempotencyKey}
+    </update>
+
+    <insert id="quote">
+        INSERT INTO product_quote(quote_no,user_id,merchant_id,source_order_no,request_hash,expires_at) VALUES(#{quoteNo},#{userId},#{merchantId},#{sourceOrderNo},#{requestHash},#{expiresAt})
+    </insert>
+
+    <insert id="quoteItem">
+        INSERT INTO quote_item(quote_no,sku_id,quantity,unit_price_cents,price_version,product_id_snapshot,product_name_snapshot,spec_snapshot) VALUES(#{quoteNo},#{skuId},#{quantity},#{unitPriceCents},#{priceVersion},#{productIdSnapshot},#{productNameSnapshot},#{specSnapshot})
+    </insert>
+
+    <insert id="audit">
+        INSERT INTO audit_log(actor_type,actor_id,action,business_no,request_id,trace_id,reason,change_summary) VALUES('MERCHANT',#{actorId},#{action},#{businessNo},#{requestId},#{traceId},#{reason},#{changeSummary})
+    </insert>
+</mapper>

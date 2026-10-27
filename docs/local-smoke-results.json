@@ -1,0 +1,39 @@
+{
+  "healthEndpoints": 7,
+  "executedAt": "2026-10-21T07:03:43.1605531Z",
+  "gatewayRoutes": 6,
+  "profile": "local",
+  "serviceChecks": [
+    {
+      "service": "tradeflow-user",
+      "gatewayRoute": "PASS",
+      "stage": "SKELETON"
+    },
+    {
+      "service": "tradeflow-product",
+      "gatewayRoute": "PASS",
+      "stage": "SKELETON"
+    },
+    {
+      "service": "tradeflow-order",
+      "gatewayRoute": "PASS",
+      "stage": "SKELETON"
+    },
+    {
+      "service": "tradeflow-payment",
+      "gatewayRoute": "PASS",
+      "stage": "SKELETON"
+    },
+    {
+      "service": "tradeflow-aftersale",
+      "gatewayRoute": "PASS",
+      "stage": "SKELETON"
+    },
+    {
+      "service": "tradeflow-payment-simulator",
+      "gatewayRoute": "PASS",
+      "stage": "SKELETON"
+    }
+  ],
+  "deniedPaths": 3
+}

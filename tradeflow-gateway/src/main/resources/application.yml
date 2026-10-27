@@ -1,0 +1,211 @@
+# 统一Nacos服务发现：dev/prod必须注册；test仅隔离注册，无服务直连回退。
+# Nacos配置中心独立开关；namespace/group须一致，注册地址必须可被调用方访问。
+server:
+  forward-headers-strategy: none
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:16379}
+      password: ${REDIS_PASSWORD:}
+      connect-timeout: 500ms
+      timeout: 500ms
+  application:
+    name: tradeflow-gateway
+  profiles:
+    default: dev
+  main:
+    web-application-type: reactive
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.reactive.ReactiveUserDetailsServiceAutoConfiguration
+  cloud:
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:18848}
+      username: ${NACOS_USERNAME:}
+      password: ${NACOS_PASSWORD:}
+      config:
+        enabled: ${TRADEFLOW_NACOS_CONFIG_ENABLED:false}
+        import-check:
+          enabled: false
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:TRADEFLOW}
+      discovery:
+        enabled: true
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:TRADEFLOW}
+        ip: ${NACOS_DISCOVERY_IP:127.0.0.1}
+    sentinel:
+      enabled: false
+    loadbalancer:
+      retry:
+        enabled: false
+    openfeign:
+      client:
+        config:
+          default:
+            connectTimeout: 1000
+            readTimeout: 3000
+management:
+  server:
+    port: ${MANAGEMENT_SERVER_PORT:18080}
+    address: ${MANAGEMENT_BIND_ADDRESS:127.0.0.1}
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 50ms,100ms,300ms,1s,3s
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,redis
+      show-details: never
+      probes:
+        enabled: true
+logging:
+  structured:
+    format:
+      console: logstash
+    json:
+      add:
+        service: ${spring.application.name}
+  level:
+    org.springframework.cloud.loadbalancer: WARN
+tradeflow:
+  entry-protection:
+    key-prefix: ${TRADEFLOW_ENTRY_KEY_PREFIX:tradeflow:entry:v1}
+    timeout-millis: ${TRADEFLOW_ENTRY_TIMEOUT_MILLIS:500}
+    rules:
+      login:
+        window-seconds: ${TRADEFLOW_ENTRY_WINDOW_SECONDS:60}
+        per-principal: ${TRADEFLOW_ENTRY_LOGIN_LIMIT:30}
+        total: ${TRADEFLOW_ENTRY_LOGIN_TOTAL:300}
+      order:
+        window-seconds: ${TRADEFLOW_ENTRY_WINDOW_SECONDS:60}
+        per-principal: ${TRADEFLOW_ENTRY_ORDER_LIMIT:20}
+        total: ${TRADEFLOW_ENTRY_ORDER_TOTAL:200}
+      query:
+        window-seconds: ${TRADEFLOW_ENTRY_WINDOW_SECONDS:60}
+        per-principal: ${TRADEFLOW_ENTRY_QUERY_LIMIT:180}
+        total: ${TRADEFLOW_ENTRY_QUERY_TOTAL:3000}
+      recovery:
+        window-seconds: ${TRADEFLOW_ENTRY_WINDOW_SECONDS:60}
+        per-principal: ${TRADEFLOW_ENTRY_RECOVERY_LIMIT:10}
+        total: ${TRADEFLOW_ENTRY_RECOVERY_TOTAL:100}
+      write:
+        window-seconds: ${TRADEFLOW_ENTRY_WINDOW_SECONDS:60}
+        per-principal: ${TRADEFLOW_ENTRY_WRITE_LIMIT:60}
+        total: ${TRADEFLOW_ENTRY_WRITE_TOTAL:600}
+  monitoring-token: ${TRADEFLOW_MONITORING_TOKEN}
+  observability:
+    enabled: true
+  security:
+    public-key: ${TRADEFLOW_JWT_PUBLIC_KEY}
+    issuer: ${TRADEFLOW_JWT_ISSUER:tradeflow}
+---
+server:
+  address: 127.0.0.1
+tradeflow: {}
+spring:
+  config:
+    activate:
+      on-profile: dev
+    import: ${NACOS_CONFIG_IMPORT:}
+  cloud:
+    sentinel:
+      enabled: ${TRADEFLOW_SENTINEL_ENABLED:false}
+      eager: true
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:18871}
+        client-ip: 127.0.0.1
+        port: 28719
+      datasource:
+        flow:
+          nacos:
+            server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:18848}
+            username: ${NACOS_USERNAME:}
+            password: ${NACOS_PASSWORD:}
+            group-id: TRADEFLOW
+            data-id: tradeflow-gateway-flow.json
+            data-type: json
+            rule-type: gw-flow
+        degrade:
+          nacos:
+            server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:18848}
+            username: ${NACOS_USERNAME:}
+            password: ${NACOS_PASSWORD:}
+            group-id: TRADEFLOW
+            data-id: tradeflow-gateway-degrade.json
+            data-type: json
+            rule-type: degrade
+---
+server:
+  address: 127.0.0.1
+  port: 0
+tradeflow:
+  observability:
+    enabled: false
+spring:
+  config:
+    activate:
+      on-profile: test
+  cloud:
+    sentinel:
+      enabled: false
+    nacos:
+      discovery:
+        enabled: false
+        register-enabled: false
+      config:
+        enabled: false
+---
+server:
+  address: ${BIND_ADDRESS:0.0.0.0}
+spring:
+  config:
+    import: ${NACOS_CONFIG_IMPORT:}
+    activate:
+      on-profile: prod
+  cloud:
+    sentinel:
+      enabled: true
+      eager: true
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD}
+        client-ip: ${SENTINEL_CLIENT_IP}
+        port: 28719
+      datasource:
+        flow:
+          nacos:
+            server-addr: ${NACOS_SERVER_ADDR}
+            username: ${NACOS_USERNAME}
+            password: ${NACOS_PASSWORD}
+            group-id: TRADEFLOW
+            data-id: tradeflow-gateway-flow.json
+            data-type: json
+            rule-type: gw-flow
+        degrade:
+          nacos:
+            server-addr: ${NACOS_SERVER_ADDR}
+            username: ${NACOS_USERNAME}
+            password: ${NACOS_PASSWORD}
+            group-id: TRADEFLOW
+            data-id: tradeflow-gateway-degrade.json
+            data-type: json
+            rule-type: degrade
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      discovery:
+        ip: ${NACOS_DISCOVERY_IP:}
+tradeflow: {}

@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.product.infrastructure.ReservationMapper">
+    <resultMap id="HeaderMap" type="com.tradeflow.product.infrastructure.ReservationMapper$Header">
+        <constructor>
+            <arg column="reservation_no" javaType="java.lang.String"/>
+            <arg column="order_no" javaType="java.lang.String"/>
+            <arg column="quote_no" javaType="java.lang.String"/>
+            <arg column="request_hash" javaType="java.lang.String"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="decision" javaType="java.lang.String"/>
+            <arg column="reject_reason" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="QuoteRowMap" type="com.tradeflow.product.infrastructure.ReservationMapper$QuoteRow">
+        <constructor>
+            <arg column="quote_no" javaType="java.lang.String"/>
+            <arg column="user_id" javaType="java.lang.String"/>
+            <arg column="source_order_no" javaType="java.lang.String"/>
+            <arg column="bound_order_no" javaType="java.lang.String"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="valid" javaType="_boolean"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="ItemMap" type="com.tradeflow.product.infrastructure.ReservationMapper$Item">
+        <constructor>
+            <arg column="sku_id" javaType="java.lang.String"/>
+            <arg column="quantity" javaType="_int"/>
+        </constructor>
+    </resultMap>
+
+    <insert id="create">
+        INSERT INTO reservation_header(reservation_no,order_no,quote_no,request_hash,status,decision,expires_at,reject_reason) VALUES(#{reservationNo},#{orderNo},#{quoteNo},#{requestHash},#{status},#{decision},#{expiresAt},#{rejectReason}) ON DUPLICATE KEY UPDATE id=id
+    </insert>
+
+    <select id="lock" resultMap="HeaderMap">
+        SELECT reservation_no,order_no,quote_no,request_hash,status,decision,reject_reason FROM reservation_header WHERE reservation_no=#{reservationNo} FOR UPDATE
+    </select>
+
+    <select id="find" resultMap="HeaderMap">
+        SELECT reservation_no,order_no,quote_no,request_hash,status,decision,reject_reason FROM reservation_header WHERE reservation_no=#{reservationNo}
+    </select>
+
+    <!-- 预占使用报价不可变归属校验所有SKU；历史确认与补偿不查询远端经营状态。 -->
+    <select id="quoteMerchant" resultType="string">SELECT merchant_id FROM product_quote WHERE quote_no=#{quoteNo}</select>
+
+    <select id="lockQuote" resultMap="QuoteRowMap">
+        SELECT quote_no,user_id,source_order_no,bound_order_no,status,(expires_at&gt;UTC_TIMESTAMP(3)) valid FROM product_quote WHERE quote_no=#{quoteNo} FOR UPDATE
+    </select>
+
+    <select id="quoteItems" resultMap="ItemMap">
+        SELECT CAST(sku_id AS CHAR) sku_id,quantity FROM quote_item WHERE quote_no=#{quoteNo} ORDER BY sku_id
+    </select>
+
+    <select id="items" resultMap="ItemMap">
+        SELECT CAST(sku_id AS CHAR) sku_id,quantity FROM reservation_item WHERE reservation_no=#{reservationNo} ORDER BY sku_id
+    </select>
+
+    <update id="bind">
+        UPDATE product_quote SET bound_order_no=#{boundOrderNo},status='BOUND',version=version+1 WHERE quote_no=#{quoteNo} AND ((status='VALID' AND bound_order_no IS NULL) OR (status='BOUND' AND bound_order_no=#{boundOrderNo}))
+    </update>
+
+    <update id="reserve">
+        UPDATE inventory SET available_qty=available_qty-#{quantity},reserved_qty=reserved_qty+#{quantity},version=version+1 WHERE warehouse_id='warehouse_main' AND sku_id=#{skuId} AND available_qty&gt;=#{quantity}
+    </update>
+
+    <update id="release">
+        UPDATE inventory SET available_qty=available_qty+#{quantity},reserved_qty=reserved_qty-#{quantity},version=version+1 WHERE warehouse_id='warehouse_main' AND sku_id=#{skuId} AND reserved_qty&gt;=#{quantity}
+    </update>
+
+    <insert id="item">
+        INSERT INTO reservation_item(reservation_no,warehouse_id,sku_id,quantity) VALUES(#{reservationNo},'warehouse_main',#{skuId},#{quantity})
+    </insert>
+
+    <insert id="ledger">
+        INSERT INTO inventory_ledger(business_no,operation_type,warehouse_id,sku_id,available_delta,reserved_delta,available_after,reserved_after) VALUES(#{businessNo},#{operationType},'warehouse_main',#{skuId},#{availableDelta},#{reservedDelta},#{availableAfter},#{reservedAfter})
+    </insert>
+
+    <update id="rejected">
+        UPDATE reservation_header SET status='REJECTED',reject_reason=#{rejectReason},version=version+1 WHERE reservation_no=#{reservationNo} AND status='RESERVED'
+    </update>
+
+    <update id="released">
+        UPDATE reservation_header SET status=IF(status='REJECTED','REJECTED','RELEASED'),decision='RELEASE',version=version+1 WHERE reservation_no=#{reservationNo} AND status IN ('RESERVED','REJECTED','RELEASED') AND decision&lt;&gt;'COMMIT'
+    </update>
+
+    <update id="confirmBalance">
+        UPDATE inventory SET reserved_qty=reserved_qty-#{quantity},version=version+1 WHERE warehouse_id='warehouse_main' AND sku_id=#{skuId} AND reserved_qty&gt;=#{quantity}
+    </update>
+
+    <update id="confirmed">
+        UPDATE reservation_header SET status='CONFIRMED',decision='COMMIT',version=version+1 WHERE reservation_no=#{reservationNo} AND status='RESERVED' AND decision='UNDECIDED'
+    </update>
+</mapper>

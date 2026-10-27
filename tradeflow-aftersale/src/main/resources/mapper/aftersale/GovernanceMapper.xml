@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.aftersale.infrastructure.GovernanceMapper">
+ <select id="tasks" resultType="map">SELECT aftersale_no,phase,status,attempts,claim_version,last_error,updated_at FROM aftersale_task WHERE status='MANUAL_REVIEW' ORDER BY updated_at,aftersale_no LIMIT #{size} OFFSET #{offset}</select>
+ <select id="countTasks" resultType="long">SELECT COUNT(*) FROM aftersale_task WHERE status='MANUAL_REVIEW'</select>
+ <select id="dispute" resultType="map">SELECT * FROM platform_dispute WHERE dispute_no=#{no}</select>
+ <select id="lockDispute" resultType="map">SELECT * FROM platform_dispute WHERE dispute_no=#{no} FOR UPDATE</select>
+ <insert id="create">INSERT INTO platform_dispute(dispute_no,aftersale_no,user_id,idempotency_key,request_hash,reason) VALUES(#{no},#{aftersaleNo},#{userId},#{key},#{hash},#{reason}) ON DUPLICATE KEY UPDATE dispute_no=dispute_no</insert>
+ <select id="byKey" resultType="map">SELECT * FROM platform_dispute WHERE user_id=#{userId} AND idempotency_key=#{key} FOR UPDATE</select>
+ <select id="disputes" resultType="map">SELECT * FROM platform_dispute <where><if test="userId != null">user_id=#{userId}</if></where> ORDER BY created_at DESC,dispute_no DESC LIMIT #{size} OFFSET #{offset}</select>
+ <select id="countDisputes" resultType="long">SELECT COUNT(*) FROM platform_dispute <where><if test="userId != null">user_id=#{userId}</if></where></select>
+ <update id="decide">UPDATE platform_dispute SET status='DECIDED',decision=#{decision},decision_reason=#{reason},decided_by=#{actor},version=version+1,decided_at=UTC_TIMESTAMP(3) WHERE dispute_no=#{no} AND version=#{version} AND status='OPEN'</update>
+ <update id="approve">UPDATE aftersale SET status=IF(type='RETURN_REFUND','WAITING_RETURN','REFUND_PROCESSING'),return_deadline=IF(type='RETURN_REFUND',UTC_TIMESTAMP(3)+INTERVAL 7 DAY,return_deadline) WHERE aftersale_no=#{no} AND status='PENDING_REVIEW'</update>
+ <update id="reject">UPDATE aftersale SET status='REJECTING' WHERE aftersale_no=#{no} AND status='PENDING_REVIEW'</update>
+ <insert id="audit">INSERT INTO aftersale_audit(actor_id,aftersale_no,operation,reason) VALUES(#{actor},#{no},#{operation},#{reason})</insert>
+</mapper>

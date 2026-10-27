@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.order.infrastructure.EntitlementMapper">
+  <!-- 保留原SQL的事务前提、条件更新、锁顺序及租约围栏；业务说明见Mapper方法中文注释。 -->
+  <resultMap id="allocationResult" type="com.tradeflow.contracts.RefundContracts$Allocation">
+    <constructor>
+      <arg column="order_item_id" name="orderItemId" javaType="java.lang.String"/>
+      <arg column="unit_no" name="unitNo" javaType="_int"/>
+      <arg column="amount_cents" name="amountCents" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="returnDispositionResult" type="com.tradeflow.contracts.RefundContracts$ReturnDisposition">
+    <constructor>
+      <arg column="order_item_id" name="orderItemId" javaType="java.lang.String"/>
+      <arg column="unit_no" name="unitNo" javaType="_int"/>
+      <arg column="disposition" name="disposition" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <select id="eligible" resultType="_int">
+    SELECT COUNT(*)
+    FROM orders
+    WHERE order_no=#{orderNo} AND (status='SHIPPED' OR (status='COMPLETED' AND completed_at&gt;UTC_TIMESTAMP(3)-INTERVAL 7 DAY))
+  </select>
+
+  <select id="digest" resultType="string">
+    SELECT allocation_hash
+    FROM refund_authorization
+    WHERE source_no=#{sourceNo}
+  </select>
+
+  <update id="digestSave">
+    UPDATE refund_authorization
+    SET allocation_hash=#{allocationHash}
+    WHERE source_no=#{sourceNo} AND allocation_hash IS NULL
+  </update>
+
+  <insert id="allocation">
+    INSERT INTO refund_allocation(source_no,order_item_id,unit_no,amount_cents)
+    VALUES(#{sourceNo},#{allocation.orderItemId},#{allocation.unitNo},#{allocation.amountCents})
+  </insert>
+
+  <select id="allocations" resultMap="allocationResult">
+    SELECT CAST(order_item_id AS CHAR) order_item_id,unit_no,amount_cents
+    FROM refund_allocation
+    WHERE source_no=#{sourceNo}
+    ORDER BY order_item_id,unit_no
+  </select>
+
+  <update id="reserve">
+    UPDATE order_item_unit
+    SET reserved_refund_cents=#{reservedRefundCents},active_aftersale_no=#{sourceNo},return_state=#{returnState},version=version+1
+    WHERE id=#{id} AND active_aftersale_no IS NULL AND reserved_refund_cents=0 AND return_state='NONE' AND paid_amount_cents-succeeded_refund_cents&gt;=#{reservedRefundCents}
+  </update>
+
+  <select id="lines" resultType="map">
+    SELECT CAST(a.order_item_id AS CHAR) order_item_id,a.unit_no,CAST(i.sku_id AS CHAR) sku_id
+    FROM refund_allocation a
+    JOIN order_item i ON i.id=a.order_item_id
+    WHERE a.source_no=#{sourceNo}
+    ORDER BY a.order_item_id,a.unit_no
+  </select>
+
+  <select id="receipt" resultType="map">
+    SELECT *
+    FROM order_return_receipt
+    WHERE source_no=#{sourceNo}
+  </select>
+
+  <insert id="receive">
+    INSERT INTO order_return_receipt(receipt_no,source_no)
+    VALUES(#{receiptNo},#{sourceNo})
+  </insert>
+
+  <insert id="disposition">
+    INSERT INTO order_return_disposition(source_no,order_item_id,unit_no,disposition)
+    VALUES(#{sourceNo},#{disposition.orderItemId},#{disposition.unitNo},#{disposition.disposition})
+  </insert>
+
+  <select id="dispositions" resultMap="returnDispositionResult">
+    SELECT CAST(order_item_id AS CHAR) order_item_id,unit_no,disposition
+    FROM order_return_disposition
+    WHERE source_no=#{sourceNo}
+    ORDER BY order_item_id,unit_no
+  </select>
+
+  <update id="receiveUnits">
+    UPDATE order_item_unit
+    SET return_state='RECEIVED',version=version+1
+    WHERE active_aftersale_no=#{sourceNo} AND return_state='RESERVED'
+  </update>
+
+  <insert id="task">
+    INSERT INTO return_stock_task(source_no)
+    VALUES(#{sourceNo})
+  </insert>
+
+  <select id="due" resultType="map">
+    SELECT *
+    FROM return_stock_task
+    WHERE (state='READY' AND next_retry_at&lt;=UTC_TIMESTAMP(3)) OR (state='RUNNING' AND lease_until&lt;UTC_TIMESTAMP(3))
+    ORDER BY created_at
+    LIMIT 1 FOR UPDATE SKIP LOCKED
+  </select>
+
+  <update id="claim">
+    UPDATE return_stock_task
+    SET state='RUNNING',claim_version=claim_version+1,attempt_count=attempt_count+1,lease_until=UTC_TIMESTAMP(3)+INTERVAL 30 SECOND
+    WHERE source_no=#{sourceNo}
+  </update>
+
+  <select id="fence" resultType="map">
+    SELECT *
+    FROM return_stock_task
+    WHERE source_no=#{sourceNo} AND state='RUNNING' AND claim_version=#{claimVersion} AND lease_until&gt;UTC_TIMESTAMP(3) FOR UPDATE
+  </select>
+
+  <update id="finish">
+    UPDATE return_stock_task
+    SET state=#{state},last_error=#{lastError},lease_until=NULL,next_retry_at=UTC_TIMESTAMP(3)+INTERVAL 5 SECOND
+    WHERE source_no=#{sourceNo} AND state='RUNNING' AND claim_version=#{claimVersion}
+  </update>
+
+  <update id="applied">
+    UPDATE order_return_receipt
+    SET status='APPLIED'
+    WHERE source_no=#{sourceNo}
+  </update>
+
+  <update id="complete">
+    UPDATE refund_authorization a
+    SET a.state='COMPLETED'
+    WHERE a.source_no=#{sourceNo} AND a.state='SETTLING' AND (a.source_type='REFUND_ONLY' OR (a.source_type='RETURN_REFUND' AND EXISTS(SELECT 1
+    FROM order_return_receipt r
+    WHERE r.source_no=a.source_no AND r.status='APPLIED')))
+  </update>
+
+  <select id="list" resultType="map">
+    SELECT *
+    FROM return_stock_task
+    ORDER BY created_at DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <update id="restart">
+    UPDATE return_stock_task
+    SET state='READY',attempt_count=0,claim_version=claim_version+1,lease_until=NULL,next_retry_at=UTC_TIMESTAMP(3),last_error=NULL
+    WHERE source_no=#{sourceNo} AND state='MANUAL_REVIEW'
+  </update>
+</mapper>

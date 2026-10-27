@@ -1,0 +1,18 @@
+# 仅放行交付产物和静态配置，不将部署机器后来生成的.local秘密发送给构建器。
+**
+!web-user/
+!web-user/dist/
+!web-user/dist/**
+!web-admin/
+!web-admin/dist/
+!web-admin/dist/**
+!deploy/
+!deploy/Dockerfile.web.release
+!deploy/Dockerfile.web.release.dockerignore
+!deploy/web/
+!deploy/web/nginx.conf
+**/.local
+**/.env
+**/.env.*
+**/*.pem
+**/*.key

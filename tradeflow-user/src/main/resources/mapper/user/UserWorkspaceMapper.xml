@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tradeflow.user.infrastructure.UserWorkspaceMapper">
+  <select id="allMerchants" resultType="map">
+    SELECT merchant_id AS merchantId,name,description,status,version FROM merchant ORDER BY merchant_id LIMIT #{size} OFFSET #{offset}
+  </select>
+  <select id="merchantCount" resultType="_long">SELECT COUNT(*) FROM merchant</select>
+  <select id="audits" resultType="map">
+    SELECT CAST(id AS CHAR) id,actor_type AS actorType,actor_id AS actorId,action,business_no AS businessNo,
+      request_id AS requestId,trace_id AS traceId,reason,change_summary AS changeSummary,result,created_at AS createdAt
+    FROM audit_log WHERE (#{actorId} IS NULL OR actor_id=#{actorId}) AND (#{businessNo} IS NULL OR business_no=#{businessNo})
+    ORDER BY id DESC LIMIT #{size} OFFSET #{offset}
+  </select>
+  <select id="auditCount" resultType="_long">
+    SELECT COUNT(*) FROM audit_log WHERE (#{actorId} IS NULL OR actor_id=#{actorId}) AND (#{businessNo} IS NULL OR business_no=#{businessNo})
+  </select>
+  <select id="addresses" resultType="map">
+    SELECT CAST(id AS CHAR) id,recipient,phone,region,address,default_address AS defaultAddress,version FROM user_address WHERE user_id=#{userId} AND deleted=FALSE ORDER BY default_address DESC,id DESC
+  </select>
+  <select id="address" resultType="map">
+    SELECT CAST(id AS CHAR) id,recipient,phone,region,address,default_address AS defaultAddress,version FROM user_address WHERE user_id=#{userId} AND id=#{id} AND deleted=FALSE
+  </select>
+  <update id="clearDefault">
+    UPDATE user_address SET default_address=FALSE,version=version+1 WHERE user_id=#{userId} AND id != #{id} AND default_address=TRUE AND deleted=FALSE
+  </update>
+  <insert id="insertAddress" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+    INSERT INTO user_address(user_id,recipient,phone,region,address,default_address) VALUES(#{userId},#{recipient},#{phone},#{region},#{address},#{defaultAddress})
+  </insert>
+  <update id="updateAddress">
+    UPDATE user_address SET recipient=#{recipient},phone=#{phone},region=#{region},address=#{address},default_address=#{defaultAddress},version=version+1 WHERE id=#{id} AND user_id=#{userId} AND version=#{version} AND deleted=FALSE
+  </update>
+  <update id="deleteAddress">
+    UPDATE user_address SET deleted=TRUE,default_address=FALSE,version=version+1 WHERE id=#{id} AND user_id=#{userId} AND version=#{version} AND deleted=FALSE
+  </update>
+  <select id="notifications" resultType="map">
+    SELECT CAST(id AS CHAR) id,title,content,read_at AS readAt,created_at AS createdAt FROM user_notification WHERE user_id=#{userId} ORDER BY id DESC LIMIT #{size} OFFSET #{offset}
+  </select>
+  <select id="notificationCount" resultType="_long">
+    SELECT COUNT(*) FROM user_notification WHERE user_id=#{userId}
+  </select>
+  <update id="readNotification">
+    UPDATE user_notification SET read_at=COALESCE(read_at,UTC_TIMESTAMP(3)) WHERE user_id=#{userId} AND id=#{id}
+  </update>
+  <select id="notificationExists" resultType="_long">
+    SELECT COUNT(*) FROM user_notification WHERE user_id=#{userId} AND id=#{id}
+  </select>
+  <insert id="notifyUser">
+    INSERT INTO user_notification(user_id,business_key,title,content) VALUES(#{userId},#{key},#{title},#{content}) ON DUPLICATE KEY UPDATE business_key=VALUES(business_key)
+  </insert>
+  <select id="merchant" resultType="map">
+    SELECT merchant_id AS merchantId,name,description,status,version FROM merchant WHERE merchant_id=#{id}
+  </select>
+  <select id="lockMerchant" resultType="map">
+    SELECT merchant_id AS merchantId,name,description,status,version FROM merchant WHERE merchant_id=#{id} FOR UPDATE
+  </select>
+  <insert id="insertMerchant">
+    INSERT INTO merchant(merchant_id,name,description) VALUES(#{merchantId},#{name},#{description})
+  </insert>
+  <update id="profile">
+    UPDATE merchant SET name=#{name},description=#{description},version=version+1 WHERE merchant_id=#{id} AND version=#{version}
+  </update>
+  <update id="merchantStatus">
+    UPDATE merchant SET status=#{status},version=version+1 WHERE merchant_id=#{id} AND version=#{version}
+  </update>
+  <select id="members" resultType="map">
+    SELECT CAST(user_id AS CHAR) userId,status,role,version FROM merchant_member WHERE merchant_id=#{id} ORDER BY user_id
+  </select>
+  <insert id="apply" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+    INSERT INTO merchant_application(user_id,merchant_id,name,description) VALUES(#{userId},#{merchantId},#{name},#{description})
+  </insert>
+  <select id="application" resultType="map">
+    SELECT CAST(id AS CHAR) id,CAST(user_id AS CHAR) userId,merchant_id AS merchantId,name,description,status,version FROM merchant_application WHERE id=#{id} FOR UPDATE
+  </select>
+  <select id="applications" resultType="map">
+    SELECT CAST(id AS CHAR) id,CAST(user_id AS CHAR) userId,merchant_id AS merchantId,name,description,status,reason,version FROM merchant_application WHERE (#{userId} IS NULL OR user_id=#{userId}) ORDER BY id DESC LIMIT #{size} OFFSET #{offset}
+  </select>
+  <select id="applicationCount" resultType="_long">
+    SELECT COUNT(*) FROM merchant_application WHERE (#{userId} IS NULL OR user_id=#{userId})
+  </select>
+  <update id="review">
+    UPDATE merchant_application SET status=#{status},reason=#{reason},version=version+1 WHERE id=#{id} AND status='PENDING' AND version=#{version}
+  </update>
+</mapper>
